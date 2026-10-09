@@ -27,14 +27,35 @@ class DepotController extends Controller
 
         $depots->each(function ($depot) {
 
-            if ($depot->sorties->isNotEmpty()) {
+            /* =========================================================
+               1. Chercher une sortie PAYÉE
+               ========================================================= */
+            $sortiePayee = $depot->sorties->first(function ($sortie) {
+                return (float) $sortie->montant_paye > 0;
+            });
+
+            /* =========================================================
+               2. Chercher un transfert EXTERNE
+               ========================================================= */
+            $transfertExterne = $depot->transferts->first(function ($transfert) {
+                return strtolower($transfert->type) === 'externe';
+            });
+
+            /* =========================================================
+               3. Déterminer le statut
+               Priorité : SORTI > TRANSFÉRÉ > PRÉSENT
+               ========================================================= */
+            if ($sortiePayee) {
+                // Une sortie a été payée → SORTI
                 $depot->statut = 'SORTI';
-            } elseif ($depot->transferts->isNotEmpty()) {
+            } elseif ($transfertExterne) {
+                // Transfert externe → TRANSFÉRÉ
                 $depot->statut = 'TRANSFÉRÉ';
             } else {
+                // Aucune sortie payée, aucun transfert externe
+                // (y compris s'il y a un transfert interne → PRÉSENT)
                 $depot->statut = 'PRÉSENT';
             }
-
         });
 
         return response()->json($depots);
@@ -133,7 +154,6 @@ class DepotController extends Controller
 
         ]);
 
-
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Erreur de validation.',
@@ -141,9 +161,7 @@ class DepotController extends Controller
             ], 422);
         }
 
-
         $data = $validator->validated();
-
 
         /*
          * ========================================================
@@ -153,13 +171,11 @@ class DepotController extends Controller
         $age = $data['age'] ?? null;
 
         if (!empty($data['date_naissance'])) {
-
             $dateNaissance = new \DateTime($data['date_naissance']);
             $aujourdHui = new \DateTime();
 
             $age = $aujourdHui->diff($dateNaissance)->y;
         }
-
 
         /*
          * ========================================================
@@ -213,7 +229,7 @@ class DepotController extends Controller
             'contact_telephone' => $data['contact_telephone'],
 
             'contact_cni' => $data['contact_cni'] ?? null,
-            
+
             'lien_parente' => $data['lien_parente'] ?? null,
 
             'prestations' => $data['prestations'] ?? [],
@@ -222,7 +238,6 @@ class DepotController extends Controller
 
             'statut' => 'PRÉSENT',
         ]);
-
 
         /*
          * ========================================================
@@ -239,7 +254,6 @@ class DepotController extends Controller
             $prestationsAvecPrix = [];
 
             foreach ($prestations as $prestation) {
-
                 $prestationsAvecPrix[$prestation->id] = [
                     'prix' => $prestation->prix
                 ];
@@ -248,14 +262,12 @@ class DepotController extends Controller
             $depot->prestations()->sync($prestationsAvecPrix);
         }
 
-
         /*
          * ========================================================
          * RECHARGER LES RELATIONS
          * ========================================================
          */
         $depot->load('prestations');
-
 
         return response()->json([
             'message' => 'Dépôt enregistré avec succès.',
@@ -303,7 +315,6 @@ class DepotController extends Controller
                 'message' => 'Dépôt introuvable.'
             ], 404);
         }
-
 
         $validator = Validator::make($request->all(), [
 
@@ -362,11 +373,11 @@ class DepotController extends Controller
 
             'contact_telephone' => 'required|string|max:30',
 
-'contact_cni' => ['nullable', 'string', 'max:50'],
+            'contact_cni' => ['nullable', 'string', 'max:50'],
+
             'lien_parente' => 'nullable|string|max:100',
 
         ]);
-
 
         if ($validator->fails()) {
             return response()->json([
@@ -375,9 +386,7 @@ class DepotController extends Controller
             ], 422);
         }
 
-
         $data = $validator->validated();
-
 
         /*
          * ========================================================
@@ -387,13 +396,11 @@ class DepotController extends Controller
         $age = $data['age'] ?? null;
 
         if (!empty($data['date_naissance'])) {
-
             $dateNaissance = new \DateTime($data['date_naissance']);
             $aujourdHui = new \DateTime();
 
             $age = $aujourdHui->diff($dateNaissance)->y;
         }
-
 
         /*
          * ========================================================
@@ -455,7 +462,6 @@ class DepotController extends Controller
             'montant_prestations' => $data['montant_prestations'] ?? 0,
         ]);
 
-
         /*
          * ========================================================
          * MISE À JOUR DES PRESTATIONS
@@ -471,7 +477,6 @@ class DepotController extends Controller
             $prestationsAvecPrix = [];
 
             foreach ($prestations as $prestation) {
-
                 $prestationsAvecPrix[$prestation->id] = [
                     'prix' => $prestation->prix
                 ];
@@ -480,9 +485,7 @@ class DepotController extends Controller
             $depot->prestations()->sync($prestationsAvecPrix);
         }
 
-
         $depot->load('prestations');
-
 
         return response()->json([
             'message' => 'Dépôt modifié avec succès.',
@@ -498,22 +501,22 @@ class DepotController extends Controller
      * ============================================================
      */
     public function destroy(Request $request, $id)
-{
-    $depot = Depot::findOrFail($id);
+    {
+        $depot = Depot::findOrFail($id);
 
-    $this->mettreEnCorbeille(
-        'DEPOT',
-        $depot->id,
-        $depot->toArray(),
-        $request->input('raison')
-    );
+        $this->mettreEnCorbeille(
+            'DEPOT',
+            $depot->id,
+            $depot->toArray(),
+            $request->input('raison')
+        );
 
-    $depot->delete();
+        $depot->delete();
 
-    return response()->json([
-        'message' => 'Dépôt supprimé.',
-    ]);
-}
+        return response()->json([
+            'message' => 'Dépôt supprimé.',
+        ]);
+    }
 
 
     /**
@@ -566,4 +569,4 @@ class DepotController extends Controller
             ], 500);
         }
     }
-} 
+}

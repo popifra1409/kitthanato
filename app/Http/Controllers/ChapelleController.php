@@ -2,87 +2,51 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Depot;
-use App\Models\Transfert;
+use App\Models\Chapelle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-class TransfertController extends Controller
+class ChapelleController extends Controller
 {
     public function index()
     {
         return response()->json(
-            Transfert::with('depot')
-                ->orderByDesc('date')
-                ->orderByDesc('heure')
-                ->get()
+            Chapelle::orderBy('nom')->get()
         );
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate($this->rules());
+        $validated = $request->validate([
+            'nom' => 'required|string|max:255|unique:chapelles,nom',
+            'prix' => 'required|numeric|min:0',
+            'actif' => 'boolean',
+        ]);
 
-        return DB::transaction(function () use ($validated) {
+        $chapelle = Chapelle::create($validated);
 
-            $transfert = Transfert::create($validated);
-
-            if ($validated['type'] === 'interne'
-                && !empty($validated['emplacement_destination'])) {
-
-                Depot::where('id', $validated['depot_id'])
-                    ->update(['emplacement' => $validated['emplacement_destination']]);
-            }
-
-            return response()->json($transfert->load('depot'), 201);
-        });
+        return response()->json($chapelle, 201);
     }
 
-    public function update(Request $request, Transfert $transfert)
+    public function update(Request $request, Chapelle $chapelle)
     {
-        $validated = $request->validate($this->rules());
+        $validated = $request->validate([
+            'nom' => 'required|string|max:255|unique:chapelles,nom,' . $chapelle->id,
+            'prix' => 'required|numeric|min:0',
+            'actif' => 'boolean',
+        ]);
 
-        return DB::transaction(function () use ($validated, $transfert) {
+        $chapelle->update($validated);
 
-            $transfert->update($validated);
-
-            if ($validated['type'] === 'interne'
-                && !empty($validated['emplacement_destination'])) {
-
-                Depot::where('id', $validated['depot_id'])
-                    ->update(['emplacement' => $validated['emplacement_destination']]);
-            }
-
-            return response()->json($transfert->fresh()->load('depot'));
-        });
+        return response()->json($chapelle);
     }
 
-    public function destroy(Request $request, Transfert $transfert)
-{
-    $this->mettreEnCorbeille(
-        'TRANSFERT',
-        $transfert->id,
-        $transfert->toArray(),
-        $request->input('raison')
-    );
-
-    $transfert->delete();
-
-    return response()->json([
-        'message' => 'Transfert supprimé .',
-    ]);
-}
-
-    private function rules(): array
+    public function destroy(Chapelle $chapelle)
     {
-        return [
-            'depot_id'                => 'required|exists:depots,id',
-            'type'                    => 'required|in:interne,externe',
-            'date'                    => 'required|date',
-            'heure'                   => 'required',
-            'emplacement_destination' => 'nullable|string|max:255',
-            'destination'             => 'nullable|string|max:255',
-            'statut'                  => 'required|in:EN ATTENTE,VALIDÉ',
-        ];
+        $chapelle->delete();
+
+        return response()->json([
+            'message' => 'Chapelle supprimée.'
+        ]);
     }
 }

@@ -6,9 +6,14 @@ use App\Models\Depot;
 use App\Models\Transfert;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class TransfertController extends Controller
 {
+    /* =========================================================
+       LISTE DES TRANSFERTS
+    ========================================================= */
+
     public function index()
     {
         return response()->json(
@@ -19,24 +24,90 @@ class TransfertController extends Controller
         );
     }
 
+    /* =========================================================
+       ENREGISTRER UN TRANSFERT
+    ========================================================= */
+
     public function store(Request $request)
     {
         $validated = $request->validate($this->rules());
 
         return DB::transaction(function () use ($validated) {
 
-            $transfert = Transfert::create($validated);
+            $depot = Depot::findOrFail($validated['depot_id']);
 
-            if ($validated['type'] === 'interne'
-                && !empty($validated['emplacement_destination'])) {
+            /* =================================================
+               SAUVEGARDER LA PROVENANCE AVANT MODIFICATION
+            ================================================= */
+            $provenance = $depot->emplacement;
 
-                Depot::where('id', $validated['depot_id'])
-                    ->update(['emplacement' => $validated['emplacement_destination']]);
+            /* =================================================
+               CONSTRUIRE LE PAYLOAD SELON LE TYPE
+            ================================================= */
+
+            $payload = [
+                'date'       => $validated['date'],
+                'heure'      => $validated['heure'],
+                'depot_id'   => $depot->id,
+                'type'       => $validated['type'],
+                'statut'     => $validated['statut'] ?? 'EN ATTENTE',
+                'provenance' => $provenance,
+            ];
+
+            if ($validated['type'] === 'interne') {
+
+                /* ---------- TRANSFERT INTERNE ---------- */
+                if (empty($validated['emplacement_destination'])) {
+                    throw ValidationException::withMessages([
+                        'emplacement_destination' =>
+                            'Le nouvel emplacement est obligatoire pour un transfert interne.',
+                    ]);
+                }
+
+                $payload['emplacement_destination'] =
+                    trim($validated['emplacement_destination']);
+                $payload['destination'] = null;
+
+                /* Mettre à jour l'emplacement du dépôt */
+                $depot->update([
+                    'emplacement' => $payload['emplacement_destination'],
+                ]);
+
+            } else {
+
+                /* ---------- TRANSFERT EXTERNE ---------- */
+                if (empty($validated['destination'])) {
+                    throw ValidationException::withMessages([
+                        'destination' =>
+                            'La destination est obligatoire pour un transfert externe.',
+                    ]);
+                }
+
+                $payload['destination'] = trim($validated['destination']);
+                $payload['emplacement_destination'] = null;
+
+                /* Le dépôt passe en TRANSFÉRÉ */
+                $depot->update([
+                    'statut' => 'TRANSFÉRÉ',
+                ]);
             }
 
-            return response()->json($transfert->load('depot'), 201);
+            /* =================================================
+               CRÉER LE TRANSFERT
+            ================================================= */
+
+            $transfert = Transfert::create($payload);
+
+            return response()->json(
+                $transfert->load('depot'),
+                201
+            );
         });
     }
+
+    /* =========================================================
+       MODIFIER UN TRANSFERT
+    ========================================================= */
 
     public function update(Request $request, Transfert $transfert)
     {
@@ -44,34 +115,88 @@ class TransfertController extends Controller
 
         return DB::transaction(function () use ($validated, $transfert) {
 
-            $transfert->update($validated);
+            $depot = Depot::findOrFail($validated['depot_id']);
 
-            if ($validated['type'] === 'interne'
-                && !empty($validated['emplacement_destination'])) {
+            /* =================================================
+               GARDER LA PROVENANCE ORIGINALE
+               (ne pas l'écraser si déjà définie)
+            ================================================= */
+            $provenance = $transfert->provenance ?: $depot->emplacement;
 
-                Depot::where('id', $validated['depot_id'])
-                    ->update(['emplacement' => $validated['emplacement_destination']]);
+            $payload = [
+                'date'       => $validated['date'],
+                'heure'      => $validated['heure'],
+                'depot_id'   => $depot->id,
+                'type'       => $validated['type'],
+                'statut'     => $validated['statut'] ?? 'EN ATTENTE',
+                'provenance' => $provenance,
+            ];
+
+            if ($validated['type'] === 'interne') {
+
+                if (empty($validated['emplacement_destination'])) {
+                    throw ValidationException::withMessages([
+                        'emplacement_destination' =>
+                            'Le nouvel emplacement est obligatoire pour un transfert interne.',
+                    ]);
+                }
+
+                $payload['emplacement_destination'] =
+                    trim($validated['emplacement_destination']);
+                $payload['destination'] = null;
+
+                $depot->update([
+                    'emplacement' => $payload['emplacement_destination'],
+                ]);
+
+            } else {
+
+                if (empty($validated['destination'])) {
+                    throw ValidationException::withMessages([
+                        'destination' =>
+                            'La destination est obligatoire pour un transfert externe.',
+                    ]);
+                }
+
+                $payload['destination'] = trim($validated['destination']);
+                $payload['emplacement_destination'] = null;
+
+                $depot->update([
+                    'statut' => 'TRANSFÉRÉ',
+                ]);
             }
 
-            return response()->json($transfert->fresh()->load('depot'));
+            $transfert->update($payload);
+
+            return response()->json(
+                $transfert->fresh()->load('depot')
+            );
         });
     }
 
+    /* =========================================================
+       SUPPRIMER UN TRANSFERT
+    ========================================================= */
+
     public function destroy(Request $request, Transfert $transfert)
-{
-    $this->mettreEnCorbeille(
-        'TRANSFERT',
-        $transfert->id,
-        $transfert->toArray(),
-        $request->input('raison')
-    );
+    {
+        $this->mettreEnCorbeille(
+            'TRANSFERT',
+            $transfert->id,
+            $transfert->toArray(),
+            $request->input('raison')
+        );
 
-    $transfert->delete();
+        $transfert->delete();
 
-    return response()->json([
-        'message' => 'Transfert supprimé .',
-    ]);
-}
+        return response()->json([
+            'message' => 'Transfert supprimé.',
+        ]);
+    }
+
+    /* =========================================================
+       RÈGLES DE VALIDATION
+    ========================================================= */
 
     private function rules(): array
     {

@@ -10,6 +10,7 @@ class Transfert extends Model
         'date',
         'heure',
         'depot_id',
+        'provenance',
         'type',
         'emplacement_destination',
         'destination',

@@ -15,6 +15,7 @@ use App\Http\Controllers\StatistiqueController;
 use App\Http\Controllers\CorbeilleController;
 use App\Http\Controllers\HistoriqueController;
 use App\Http\Controllers\DeclarationDecesController;
+use App\Http\Controllers\ServiceController;
 
 /* =====================================================
    AUTHENTIFICATION
@@ -67,8 +68,10 @@ Route::get('/declarations/{id}', [DeclarationDecesController::class, 'show']);
 Route::put('/declarations/{id}', [DeclarationDecesController::class, 'update']);
 Route::delete('/declarations/{id}', [DeclarationDecesController::class, 'destroy']);
 
+Route::get('/services', [ServiceController::class, 'index']);
+Route::post('/services', [ServiceController::class, 'store']);
 /* =====================================================
-   ROUTES PROTÉGÉES (admin uniquement, token requis)
+   ROUTES PROTÉGÉES 
 ===================================================== */
 Route::middleware('auth:sanctum')->group(function () {
 
