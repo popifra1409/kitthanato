@@ -46,12 +46,14 @@ class PrestationController extends Controller
             'actif' => true,
         ]);
 
+        /*
         $this->audit(
             'PRESTATIONS',
             'AJOUT',
             "Ajout de la prestation {$prestation->nom}",
             $prestation->toArray()
         );
+        */
 
         return response()->json(
             $prestation,
@@ -93,6 +95,7 @@ class PrestationController extends Controller
             'actif' => $data['actif'] ?? true,
         ]);
 
+        /*
         $this->audit(
             'PRESTATIONS',
             'MODIFICATION',
@@ -102,6 +105,7 @@ class PrestationController extends Controller
                 'apres' => $prestation->toArray(),
             ]
         );
+        */
 
         return response()->json($prestation);
     }
@@ -118,6 +122,7 @@ class PrestationController extends Controller
             'actif' => false,
         ]);
 
+        /*
         $this->audit(
             'PRESTATIONS',
             'DESACTIVATION',
@@ -126,6 +131,7 @@ class PrestationController extends Controller
                 'prestation_id' => $id,
             ]
         );
+        */
 
         return response()->json([
             'message' => 'Prestation désactivée avec succès.'

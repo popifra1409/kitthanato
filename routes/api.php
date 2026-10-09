@@ -105,7 +105,8 @@ Route::middleware('auth:sanctum')->group(function () {
         /* CHAPELLES ADMIN */
         Route::get('/chapelles-admin', [ChapelleController::class, 'indexAdmin']);
         Route::post('/chapelles', [ChapelleController::class, 'store']);
-        Route::put('/chapelles/{id}', [ChapelleController::class, 'update']);
-        Route::delete('/chapelles/{id}', [ChapelleController::class, 'destroy']);
+        Route::put('/chapelles/{chapelle}', [ChapelleController::class, 'update']);
+        Route::delete('/chapelles/{chapelle}', [ChapelleController::class, 'destroy']);
+                                          
     });
 });

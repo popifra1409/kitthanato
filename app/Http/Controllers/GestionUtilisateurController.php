@@ -57,6 +57,7 @@ class GestionUtilisateurController extends Controller
             'role' => strtoupper($data['role']),
         ]);
 
+        /*
         $this->audit(
             'UTILISATEURS',
             'AJOUT',
@@ -66,6 +67,7 @@ class GestionUtilisateurController extends Controller
                 'role' => $user->role,
             ]
         );
+        */
 
         return response()->json([
             'message' => 'Compte créé avec succès.',
@@ -125,6 +127,7 @@ class GestionUtilisateurController extends Controller
 
         $user->save();
 
+        /*
         $this->audit(
             'UTILISATEURS',
             'MODIFICATION',
@@ -137,6 +140,7 @@ class GestionUtilisateurController extends Controller
                 ],
             ]
         );
+        */
 
         return response()->json([
             'message' => 'Compte modifié avec succès.',
@@ -164,6 +168,7 @@ class GestionUtilisateurController extends Controller
 
         $nom = $user->name;
 
+        /*
         $this->audit(
             'UTILISATEURS',
             'SUPPRESSION',
@@ -173,6 +178,7 @@ class GestionUtilisateurController extends Controller
                 'role' => $user->role,
             ]
         );
+        */
 
         $user->delete();
 
@@ -180,6 +186,4 @@ class GestionUtilisateurController extends Controller
             'message' => 'Compte supprimé avec succès.'
         ]);
     }
-
-    
 }
