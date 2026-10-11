@@ -1,59 +1,168 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# THANATO — Laravel + React
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Application de gestion de morgue (dépôts, sorties, transferts, levées, déclarations de décès).
+Le front React et l'API Laravel vivent maintenant dans **un seul projet** : Laravel sert
+l'application React (via Vite) et l'API REST sous `/api`.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 1. Installation
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+```bash
+composer install
+npm install
+cp .env.example .env        # puis renseigner DB_* (PostgreSQL)
+php artisan key:generate
+php artisan migrate         # crée aussi les rôles/permissions et convertit les anciens rôles
+php artisan db:seed         # (installation neuve) compte « Administrateur » / Admin@1234
+```
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Développement
 
-## Learning Laravel
+```bash
+composer run dev            # php artisan serve + queue + logs + vite (HMR React)
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+Ouvrir http://127.0.0.1:8000 — plus besoin de lancer un front séparé ni de configurer CORS.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Production
 
-## Laravel Sponsors
+```bash
+npm run build               # génère public/build
+php artisan migrate --force
+php artisan optimize
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Le serveur web doit pointer sur `public/`. Toutes les URL non-API renvoient la vue
+`resources/views/app.blade.php`, qui monte React ; react-router gère ensuite la navigation.
 
-### Premium Partners
+---
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## 2. Organisation du front (`resources/js`)
 
-## Contributing
+```
+resources/js/
+├── main.jsx                 point d'entrée Vite
+├── App.jsx                  routes + permission requise par page
+├── services/
+│   ├── api.js               ★ TOUS les appels à l'API REST
+│   ├── http.js              client axios (URL de base, token, erreurs, 401)
+│   ├── session.js           token / utilisateur / hasPermission()
+│   └── SessionContext.jsx   useSession() : user, can(), login(), logout()
+├── components/              Navbar, ProtectedRoute, dialogues…
+└── pages/                   une page par écran (+ RolesPermissions.jsx)
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Appeler le backend
 
-## Code of Conduct
+**Aucune URL ne doit être écrite dans une page.** On passe toujours par `services/api.js` :
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```js
+import api, { asList } from "../services/api";
 
-## Security Vulnerabilities
+const depots = asList(await api.depots.list());
+await api.depots.create(donnees);
+await api.depots.update(id, donnees);
+await api.depots.remove(id, "Doublon");          // raison → corbeille
+await api.sorties.paiement(sortieId, 15000);
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- Le token Bearer est ajouté automatiquement.
+- Les fonctions renvoient directement le JSON.
+- En cas d'erreur, une `ApiError` est levée : `error.message`, `error.status`,
+  `error.errors` (validation Laravel), `error.firstMessage` (premier message lisible).
+- Un `401` vide la session et renvoie à l'écran de connexion.
 
-## License
+**Nouvel endpoint ?** Ajoutez-le dans `api.js` (une ligne), jamais dans la page.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### Droits côté front
+
+```jsx
+import { hasPermission } from "../services/session";
+{hasPermission("depots.delete") && <button>Supprimer</button>}
+
+// ou dans un composant :
+const { can } = useSession();
+```
+
+Les pages sont protégées dans `App.jsx` (`permission: "sorties.view"`). Le front ne fait
+que masquer : **la vraie sécurité est dans l'API** (chaque route vérifie sa permission).
+
+---
+
+## 3. Utilisateurs, rôles et permissions
+
+| Élément | Où |
+|---|---|
+| Catalogue des permissions + rôles par défaut | `config/permissions.php` |
+| Tables | `roles`, `permissions`, `permission_role`, `users.role_id` |
+| Vérification API | middleware `permission:depots.create` (ou `a\|b` pour l'un OU l'autre) |
+| Vérification PHP | `$user->hasPermission('depots.create')` ou `$user->can('depots.create')` |
+| Écran | Paramètres → **Rôles & permissions** / **Utilisateurs** |
+
+- **ADMIN** est super-administrateur : il a toujours tout, ne peut pas être supprimé,
+  et on ne peut pas supprimer/rétrograder/désactiver le **dernier** admin actif.
+- Rôles par défaut : `USER1` (Thanatopracteur), `USER2` (Médecin légiste). On peut en créer
+  d'autres (ex. Caissier) et cocher leurs permissions.
+- Cocher une permission coche aussi celles dont la page a besoin
+  (`config/permissions.php` → `dependances`).
+- Un compte peut être **désactivé** (connexion refusée, sessions coupées) ou **supprimé**
+  (suppression logique : il reste visible dans l'historique et les « créé par »).
+- Changement de rôle ou désactivation ⇒ les sessions ouvertes de ce compte sont fermées.
+
+Ajouter une permission : l'ajouter dans `config/permissions.php`, puis
+
+```bash
+php artisan permissions:sync                # ajoute les nouvelles, garde les réglages des rôles
+php artisan permissions:sync --reset-roles  # réapplique les droits par défaut d'ADMIN/USER1/USER2
+```
+
+---
+
+## 4. Traçabilité (« qui a fait quoi »)
+
+### `created_by` / `updated_by`
+
+Présents sur : users, roles, depots, sorties, levees, transferts, prestations, chapelles,
+professions, services, declaration_deces, finance_to_sortie.
+
+Ils sont remplis **automatiquement** par le trait `App\Models\Concerns\TracksUser` avec
+l'utilisateur connecté (impossible de les forcer depuis un formulaire). Relations :
+
+```php
+Depot::with(Depot::TRACE)->get();   // charge createur et modificateur (id, name)
+$depot->createur->name;
+```
+
+### Journal d'audit (`audit_logs`, écran Paramètres → Historique)
+
+Le trait `LogsActivity` enregistre chaque **CREATION**, **MODIFICATION** (avec les seuls
+champs modifiés : avant → après) et **SUPPRESSION**, avec l'utilisateur, l'IP, le
+navigateur et l'élément concerné (`auditable_type` / `auditable_id`).
+
+Les actions métier sont tracées explicitement : `CONNEXION`, `ECHEC_CONNEXION`,
+`DECONNEXION`, `MOT_DE_PASSE`, `PAIEMENT` (montant encaissé + encaisseur),
+`PERMISSIONS` (permissions ajoutées / retirées d'un rôle).
+
+Pour tracer une nouvelle action :
+
+```php
+use App\Support\Audit;
+Audit::log('SORTIES', 'ANNULATION', "Annulation de la sortie #{$sortie->id}", ['motif' => $motif], $sortie);
+```
+
+Filtres de l'API : `GET /api/historique?module=DEPOTS&action=MODIFICATION&user_id=3&du=2026-10-01&au=2026-10-31`
+et l'historique d'un élément : `?sujet_type=Depot&sujet_id=12`.
+
+Les mots de passe, tokens et signatures ne sont jamais écrits dans le journal.
+
+---
+
+## 5. Tests
+
+Les tests utilisent PostgreSQL (le code utilise `ILIKE`). Créez une base dédiée :
+
+```bash
+createdb kit_thanato_testing
+php artisan test
+```
