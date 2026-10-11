@@ -1,0 +1,548 @@
+
+/* =========================================================
+   PAGE GÉNÉRALE
+========================================================= */
+
+.recu-page {
+    min-height: 100vh;
+    background: #f1f1f1;
+    padding: 30px;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #111;
+}
+
+
+/* =========================================================
+   BARRE D'ACTIONS
+========================================================= */
+
+.recu-actions {
+    width: 210mm;
+    margin: 0 auto 20px;
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.btn-recu {
+    border: none;
+    padding: 11px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-retour {
+    background: #666;
+    color: white;
+}
+
+.btn-print {
+    background: #6f42c1;
+    color: white;
+}
+
+.btn-recu:hover {
+    opacity: 0.88;
+}
+
+
+/* =========================================================
+   FEUILLE DU REÇU
+========================================================= */
+
+.recu-container {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    background: white;
+    padding: 15mm;
+    box-sizing: border-box;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+}
+
+
+/* =========================================================
+   EN-TÊTE
+========================================================= */
+
+.recu-header {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 120px 1fr;
+    align-items: start;
+    border-bottom: 2px solid #111;
+    padding-bottom: 12px;
+}
+
+
+/* HÔPITAL : EXTRÊME GAUCHE */
+
+.recu-header-left {
+    text-align: left;
+    justify-self: start;
+}
+
+.recu-header-left h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.recu-header-left h2 {
+    margin: 5px 0;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.recu-header-left p {
+    margin: 3px 0;
+    font-size: 10px;
+}
+
+
+/* LOGO : CENTRE */
+
+.recu-header-center {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.logo-circle {
+    width: 70px;
+    height: 70px;
+    border: 2px solid #222;
+    border-radius: 50%;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    font-size: 11px;
+    font-weight: bold;
+}
+
+
+/* RÉPUBLIQUE : EXTRÊME DROITE */
+
+.recu-header-right {
+    text-align: right;
+    justify-self: end;
+}
+
+.recu-header-right h1 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.recu-header-right h2 {
+    margin: 4px 0 7px;
+    font-size: 10px;
+    font-weight: 500;
+    font-style: italic;
+}
+
+
+/* =========================================================
+   RÉFÉRENCE
+========================================================= */
+
+.recu-reference {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+
+    margin-top: 12px;
+    padding: 8px 0;
+
+    border-bottom: 1px solid #222;
+}
+
+.reference-left {
+    text-align: left;
+    font-size: 13px;
+}
+
+.reference-left p {
+    margin: 2px 0;
+}
+
+.reference-center {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    font-size: 15px;
+}
+
+.reference-center span {
+    font-size: 9px;
+    margin-top: 3px;
+}
+
+.reference-right {
+    display: flex;
+    flex-direction: column;
+    text-align: right;
+    font-size: 11px;
+    font-style: italic;
+}
+
+.reference-right span {
+    font-size: 9px;
+    margin-top: 3px;
+}
+
+
+/* =========================================================
+   INFORMATIONS
+========================================================= */
+
+.recu-informations {
+    margin-top: 18px;
+    font-size: 12px;
+}
+
+.recu-soussigne {
+    margin-bottom: 15px;
+    line-height: 1.6;
+    text-align: left;
+    margin-left: 150px;
+}
+
+.mot-italique {
+    font-style: italic;
+    font-weight: normal;
+    font-size: 10px;
+}
+
+.ligne-information {
+    margin: 12px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ligne-consultation {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-top: 15px;
+    gap: 20px;
+}
+
+.ligne-consultation > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+
+/* =========================================================
+   TABLEAU
+========================================================= */
+
+.prestations-section {
+    margin-top: 25px;
+}
+
+.recu-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.recu-table th,
+.recu-table td {
+    border: 1px solid #222;
+    padding: 8px 7px;
+}
+
+.recu-table th {
+    background: #f0f0f0;
+    text-align: center;
+    font-weight: 800;
+}
+
+.col-num {
+    width: 35px;
+}
+
+.col-designation {
+    width: auto;
+}
+
+.col-qte {
+    width: 45px;
+}
+
+.col-prix {
+    width: 95px;
+}
+
+.col-total {
+    width: 100px;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.empty-row {
+    text-align: center;
+    padding: 20px !important;
+}
+
+
+/* =========================================================
+   ZONE DES TOTAUX
+========================================================= */
+
+.recu-total-section {
+   .recu-total-section {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-top: 35px;
+}
+
+
+/* BOX GAUCHE */
+
+.total-box-left {
+    width: 42%;
+    margin-left: 0;
+    margin-right: auto;
+    text-align: left;
+}
+
+
+/* BOX DROITE */
+
+.total-box-right {
+    width: 30%;
+    margin-left: auto;
+    margin-right: 0;
+    text-align: right;
+}
+}
+
+
+/* =========================================================
+   RECTANGLE GAUCHE
+========================================================= */
+
+.total-box {
+    border: 1.5px solid #222;
+    min-height: 75px;
+    padding: 8px;
+    box-sizing: border-box;
+    width: 40%;
+}
+
+.total-box-left {
+    text-align: left;
+}
+
+.total-box-title {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+.total-box-subtitle {
+    font-size: 9px;
+    font-style: italic;
+    margin-top: 3px;
+}
+
+.montant-lettres {
+    margin-top: 20px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   RECTANGLE DROITE
+========================================================= */
+
+.total-box-right {
+    text-align: right;
+}
+
+.total-chiffre {
+    margin-top: 20px;
+    font-size: 17px;
+    font-weight: 800;
+}
+
+
+/* =========================================================
+   SIGNATURE
+========================================================= */
+
+.signature-cachet {
+    margin-top: 30px;
+    text-align: center;
+}
+
+.signature-cachet p {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.signature-espace {
+    height: 45px;
+    margin-top: 8px;
+    border-bottom: 1px solid #222;
+}
+
+
+/* =========================================================
+   INFORMATIONS PAIEMENT
+========================================================= */
+
+.recu-paiement {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+
+    margin-top: 30px;
+    padding: 10px 0;
+
+    border-top: 1px solid #222;
+    border-bottom: 1px solid #222;
+
+    font-size: 10px;
+}
+
+
+/* =========================================================
+   PIED DE PAGE
+========================================================= */
+
+.recu-footer {
+    margin-top: 25px;
+    text-align: center;
+    font-size: 9px;
+    color: #444;
+}
+
+.recu-footer p {
+    margin: 4px 0;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 900px) {
+
+    .recu-page {
+        padding: 10px;
+    }
+
+    .recu-actions {
+        width: 100%;
+    }
+
+    .recu-container {
+        width: 100%;
+        min-height: auto;
+        padding: 20px;
+    }
+
+    .recu-header {
+    }
+
+    .recu-header-left{
+        text-align: left;
+    }
+    .recu-header-right {
+        text-align: right;
+    }
+
+    .recu-header-center {
+        
+    }
+
+    .recu-reference {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .reference-left
+    {
+        
+        text-align: left;
+        
+    margin-left: 30px;
+    }
+    .reference-center,.reference-right{
+        
+        text-align: left;
+        
+    margin-left: 100px;
+    }
+
+    .recu-total-section {
+        grid-template-columns: 1fr;
+    }
+
+    .recu-paiement {
+        flex-direction: column;
+    }
+
+    .recu-table {
+        font-size: 9px;
+    }
+
+    .recu-table th,
+    .recu-table td {
+        padding: 5px 3px;
+    }
+}
+
+
+/* =========================================================
+   IMPRESSION
+========================================================= */
+
+@media print {
+
+    @page {
+        size: A4;
+        margin: 0;
+    }
+
+    body {
+        margin: 0;
+        background: white;
+    }
+
+    .recu-page {
+        padding: 0;
+        background: white;
+    }
+
+    .recu-actions {
+        display: none;
+    }
+
+    .recu-container {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0;
+        padding: 12mm;
+        box-shadow: none;
+    }
+}

@@ -1,0 +1,222 @@
+/* =========================================================
+   OVERLAY
+========================================================= */
+
+.confirm-overlay {
+    position: fixed;
+    inset: 0;
+
+    z-index: 9999;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    background: rgba(28, 18, 42, 0.55);
+    backdrop-filter: blur(5px);
+
+    animation: confirmFadeIn 0.2s ease;
+}
+
+@keyframes confirmFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* =========================================================
+   MODALE
+========================================================= */
+
+.confirm-modal {
+    width: 100%;
+    max-width: 460px;
+
+    background: #ffffff;
+
+    border-radius: 16px;
+
+    box-shadow:
+        0 20px 60px rgba(28, 18, 42, 0.28);
+
+    overflow: hidden;
+
+    animation: confirmSlideUp 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+@keyframes confirmSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.confirm-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+
+    padding: 24px 25px 18px;
+
+    border-bottom: 1px solid #f0ebf5;
+}
+
+.confirm-icon {
+    width: 46px;
+    height: 46px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    border-radius: 50%;
+
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.confirm-header h2 {
+    margin: 0;
+
+    font-size: 19px;
+    font-weight: 800;
+
+    color: #2c1f3f;
+}
+
+.confirm-warning .confirm-icon {
+    background: #fff7e5;
+    color: #c78b27;
+}
+
+.confirm-danger .confirm-icon {
+    background: #fef2f2;
+    color: #c0395a;
+}
+
+.confirm-info .confirm-icon {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+/* =========================================================
+   BODY
+========================================================= */
+
+.confirm-body {
+    padding: 20px 25px;
+}
+
+.confirm-body p {
+    margin: 0;
+
+    color: #4a3f5a;
+
+    font-size: 14px;
+    line-height: 1.6;
+
+    white-space: pre-line;
+}
+
+/* =========================================================
+   ACTIONS
+========================================================= */
+
+.confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+
+    padding: 18px 25px 22px;
+
+    background: #faf8fd;
+
+    border-top: 1px solid #f0ebf5;
+}
+
+.confirm-actions button {
+    height: 44px;
+
+    padding: 0 22px;
+
+    border: none;
+    border-radius: 10px;
+
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+
+    cursor: pointer;
+
+    transition: all 0.2s ease;
+}
+
+.confirm-actions button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.confirm-cancel {
+    background: #ffffff;
+    color: #5a5069;
+
+    border: 1px solid #ddd3e7 !important;
+}
+
+.confirm-cancel:hover:not(:disabled) {
+    background: #f3eefa;
+    border-color: #c4b5d8 !important;
+}
+
+.confirm-confirm {
+    color: #ffffff;
+}
+
+.confirm-confirm-warning {
+    background: linear-gradient(135deg, #d6a928, #c78b27);
+}
+
+.confirm-confirm-warning:hover:not(:disabled) {
+    box-shadow: 0 6px 18px rgba(214, 169, 40, 0.35);
+}
+
+.confirm-confirm-danger {
+    background: linear-gradient(135deg, #c0395a, #a02f4d);
+}
+
+.confirm-confirm-danger:hover:not(:disabled) {
+    box-shadow: 0 6px 18px rgba(192, 57, 90, 0.35);
+}
+
+.confirm-confirm-info {
+    background: linear-gradient(135deg, #6d28d9, #8b5cf6);
+}
+
+.confirm-confirm-info:hover:not(:disabled) {
+    box-shadow: 0 6px 18px rgba(109, 40, 217, 0.35);
+}
+
+.confirm-confirm:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+@media (max-width: 500px) {
+    .confirm-actions {
+        flex-direction: column-reverse;
+    }
+
+    .confirm-actions button {
+        width: 100%;
+    }
+}

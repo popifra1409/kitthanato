@@ -2,18 +2,21 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
-    /**
-     * A basic test example.
-     */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_la_spa_react_est_servie_sur_toutes_les_routes_web(): void
     {
-        $response = $this->get('/');
+        $this->withoutVite();
 
-        $response->assertStatus(200);
+        $this->get('/')->assertOk()->assertSee('<div id="root"></div>', false);
+        $this->get('/DepotCorps')->assertOk()->assertSee('<div id="root"></div>', false);
+        $this->get('/Parametres?section=roles')->assertOk();
+    }
+
+    public function test_les_routes_api_inconnues_ne_renvoient_pas_la_spa(): void
+    {
+        $this->getJson('/api/inexistant')->assertNotFound();
     }
 }

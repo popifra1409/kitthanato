@@ -1,0 +1,864 @@
+/* =========================================================
+   RESET
+========================================================= */
+
+* {
+    box-sizing: border-box;
+}
+
+/* =========================================================
+   VARIABLES (mode clair)
+========================================================= */
+
+.levees-page {
+    --lv-bg: radial-gradient(
+            circle at top right,
+            #f0e4f7,
+            transparent 35%
+        ),
+        #f8f5fb;
+    --lv-surface: #ffffff;
+    --lv-surface-soft: #faf7fc;
+    --lv-border: #e4d8ea;
+    --lv-border-soft: #eee8f2;
+    --lv-text: #382044;
+    --lv-text-soft: #7d6b87;
+    --lv-text-muted: #95839e;
+    --lv-primary: #6d28d9;
+    --lv-primary-soft: #8b5cf6;
+    --lv-accent: #d6a928;
+    --lv-green: #37794d;
+    --lv-green-bg: #e5f4eb;
+    --lv-orange: #9a7028;
+    --lv-orange-bg: #fff2dc;
+    --lv-purple: #74408d;
+    --lv-purple-bg: #eee3f5;
+    --lv-shadow: 0 8px 28px rgba(67, 29, 87, 0.07);
+
+    min-height: 100vh;
+    padding: 30px 40px 55px;
+
+    background: var(--lv-bg);
+    color: var(--lv-text);
+
+    transition: background 0.25s ease, color 0.25s ease;
+}
+
+/* =========================================================
+   MODE SOMBRE — Variables
+========================================================= */
+
+body.dark-mode .levees-page {
+    --lv-bg: radial-gradient(
+            circle at top right,
+            #1e1530,
+            transparent 35%
+        ),
+        #0f0a1a;
+    --lv-surface: #241a33;
+    --lv-surface-soft: #1a1226;
+    --lv-border: #342548;
+    --lv-border-soft: #2a1f3d;
+    --lv-text: #e8e0f0;
+    --lv-text-soft: #a89ab8;
+    --lv-text-muted: #8b7ba0;
+    --lv-primary: #a78bfa;
+    --lv-primary-soft: #8b5cf6;
+    --lv-accent: #f0c75e;
+    --lv-green: #4ade80;
+    --lv-green-bg: #14301f;
+    --lv-orange: #fbbf24;
+    --lv-orange-bg: #3a2a10;
+    --lv-purple: #c084fc;
+    --lv-purple-bg: #2a1a3d;
+    --lv-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.levees-header {
+    min-height: 105px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+
+}
+
+body.dark-mode .levees-header {
+    background: linear-gradient(120deg, #3b0764, #5b21b6);
+    box-shadow: 0 12px 30px #54209e;
+}
+
+.levees-title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.levees-title strong {
+    color: #54209e;
+    font-size: 23px;
+    font-weight: 900;
+    letter-spacing: 2px;
+}
+
+.levees-date {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.levees-date strong {
+    color: #54209e;
+    font-size: 15px;
+    text-transform: capitalize;
+}
+
+.levees-date small {
+    color: #54209e;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+body.dark-mode .levees-date small {
+    color: #c084fc;
+}
+
+/* =========================================================
+   ERREUR
+========================================================= */
+
+.levees-error {
+    padding: 15px 20px;
+    margin-bottom: 20px;
+
+    background: #fef2f2;
+    color: #b91c1c;
+
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+
+    font-size: 13px;
+    font-weight: 600;
+}
+
+body.dark-mode .levees-error {
+    background: #2a1010;
+    color: #fca5a5;
+    border-color: #4a1a1a;
+}
+
+/* =========================================================
+   BARRE OUTILS
+========================================================= */
+
+.levees-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+
+    gap: 14px;
+
+    padding: 16px 18px;
+    margin-bottom: 16px;
+
+    border: 1px solid var(--lv-border);
+    border-radius: 14px;
+
+    background: var(--lv-surface);
+
+    box-shadow: 0 6px 20px rgba(68, 30, 88, 0.06);
+
+    transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+/* ------- RECHERCHE ------- */
+
+.levees-search {
+    flex: 1;
+    min-width: 220px;
+
+    height: 50px;
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    padding: 0 15px;
+
+    border: 1px solid var(--lv-border);
+    border-radius: 10px;
+
+    background: var(--lv-surface-soft);
+
+    transition: 0.2s ease;
+}
+
+.levees-search:focus-within {
+    border-color: var(--lv-primary-soft);
+    background: var(--lv-surface);
+    box-shadow: 0 0 0 3px rgba(148, 85, 183, 0.1);
+}
+
+.levees-search span {
+    color: var(--lv-purple);
+    font-size: 24px;
+}
+
+.levees-search input {
+    width: 100%;
+    height: 100%;
+
+    border: none;
+    outline: none;
+
+    background: transparent;
+    color: var(--lv-text);
+
+    font-size: 14px;
+}
+
+.levees-search input::placeholder {
+    color: var(--lv-text-muted);
+}
+
+/* ------- FILTRE ------- */
+
+.levees-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.levees-filter label {
+    color: var(--lv-text-muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+}
+
+.levees-filter select {
+    height: 48px;
+    min-width: 160px;
+
+    padding: 0 13px;
+
+    border: 1px solid var(--lv-border);
+    border-radius: 9px;
+
+    outline: none;
+
+    background: var(--lv-surface-soft);
+    color: var(--lv-purple);
+
+    font-size: 13px;
+    font-weight: 800;
+
+    cursor: pointer;
+}
+
+/* ------- NAVIGATION SEMAINES ------- */
+
+.levees-week-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.week-btn {
+    width: 42px;
+    height: 42px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 1px solid var(--lv-border);
+    border-radius: 9px;
+
+    background: var(--lv-surface);
+    color: var(--lv-purple);
+
+    font-size: 20px;
+    font-weight: 800;
+
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.week-btn:hover {
+    background: var(--lv-purple-bg);
+    border-color: var(--lv-primary-soft);
+}
+
+.week-btn-today {
+    height: 42px;
+    padding: 0 16px;
+
+    border: 1px solid var(--lv-border);
+    border-radius: 9px;
+
+    background: var(--lv-surface);
+    color: var(--lv-purple);
+
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.week-btn-today:hover {
+    background: var(--lv-purple-bg);
+    border-color: var(--lv-primary-soft);
+}
+
+.week-btn-today.active {
+    background: linear-gradient(135deg, #6d28d9, #8b5cf6);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 5px 15px rgba(109, 40, 217, 0.25);
+}
+
+/* ------- REFRESH ------- */
+
+.levees-refresh {
+    width: 50px;
+    height: 50px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 1px solid var(--lv-border);
+    border-radius: 10px;
+
+    background: var(--lv-surface);
+    color: var(--lv-purple);
+
+    font-size: 22px;
+
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.levees-refresh:hover {
+    background: var(--lv-purple-bg);
+    border-color: var(--lv-primary-soft);
+    transform: rotate(90deg);
+}
+
+/* =========================================================
+   BOARD
+========================================================= */
+
+.levees-board {
+    overflow: hidden;
+
+    border: 1px solid var(--lv-border);
+    border-radius: 17px;
+
+    background: var(--lv-surface);
+
+    box-shadow: var(--lv-shadow);
+
+    transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+/* =========================================================
+   BANDEAU
+========================================================= */
+
+.departure-banner {
+    min-height: 78px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 0 25px;
+
+    background: linear-gradient(90deg, #f0e5f6, #faf8fc);
+
+    border-bottom: 1px solid var(--lv-border);
+}
+
+body.dark-mode .departure-banner {
+    background: linear-gradient(90deg, #2a1a3d, #1e1530);
+}
+
+.departure-banner strong {
+    color: #54209e;;
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 1px;
+}
+
+.departure-number {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.departure-number small {
+    color: var(--lv-text-soft);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.departure-number strong {
+    width: 42px;
+    height: 42px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: linear-gradient(135deg, #6d28d9, #8b5cf6);
+    color: white;
+
+    font-size: 15px;
+    font-weight: 800;
+}
+
+/* =========================================================
+   COLONNES
+========================================================= */
+
+.levees-columns {
+    display: grid;
+
+    grid-template-columns:
+        125px
+        105px
+        minmax(175px, 1.1fr)
+        120px
+        minmax(190px, 1.4fr)
+        155px;
+
+    min-height: 58px;
+
+    align-items: center;
+
+    background: var(--lv-surface-soft);
+
+    border-bottom: 1px solid var(--lv-border);
+
+    color: var(--lv-text-muted);
+
+    font-size: 11px;
+    font-weight: 900;
+
+    letter-spacing: 0.8px;
+}
+
+.levees-columns > div {
+    padding: 0 15px;
+}
+
+/* =========================================================
+   LIGNES
+========================================================= */
+
+.levee-row {
+    display: grid;
+
+    grid-template-columns:
+        125px
+        105px
+        minmax(175px, 1.1fr)
+        120px
+        minmax(190px, 1.4fr)
+        155px;
+
+    min-height: 88px;
+
+    align-items: center;
+
+    border-bottom: 1px solid var(--lv-border-soft);
+
+    transition: 0.18s;
+}
+
+.levee-row:hover {
+    background: var(--lv-surface-soft);
+    box-shadow: inset 4px 0 #914eb2;
+}
+
+body.dark-mode .levee-row:hover {
+    box-shadow: inset 4px 0 #a78bfa;
+}
+
+.levee-row > div {
+    padding: 0 15px;
+
+    color: var(--lv-text-soft);
+    font-size: 13px;
+}
+
+/* =========================================================
+   CELLULES SPÉCIALES
+========================================================= */
+
+.levee-date-cell strong {
+    color: var(--lv-text-soft);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.levee-time-cell strong {
+    color: var(--lv-purple);
+    font-size: 20px;
+    font-weight: 900;
+}
+
+.levee-chapelle-cell span {
+    display: inline-block;
+
+    padding: 8px 11px;
+
+    border-radius: 8px;
+
+    background: var(--lv-purple-bg);
+    color: var(--lv-purple);
+
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.levee-code {
+    display: inline-block;
+
+    padding: 8px 11px;
+
+    border-radius: 8px;
+
+    background: var(--lv-purple-bg);
+    color: var(--lv-purple);
+
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+}
+
+.levee-defunt strong {
+    color: var(--lv-text);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+/* =========================================================
+   STATUT
+========================================================= */
+
+.levee-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    padding: 8px 12px;
+
+    border-radius: 20px;
+
+    font-size: 11px;
+    font-weight: 900;
+
+    white-space: nowrap;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.levee-status.planifie {
+    background: var(--lv-purple-bg);
+    color: var(--lv-purple);
+}
+
+.levee-status.confirme {
+    background: var(--lv-green-bg);
+    color: var(--lv-green);
+}
+
+.levee-status.attente {
+    background: var(--lv-orange-bg);
+    color: var(--lv-orange);
+}
+
+/* =========================================================
+   VIDE / CHARGEMENT
+========================================================= */
+
+.levees-empty {
+    min-height: 240px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    gap: 12px;
+
+    color: var(--lv-text-muted);
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.empty-icon,
+.loading-icon {
+    width: 50px;
+    height: 50px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: var(--lv-purple-bg);
+    color: var(--lv-purple);
+
+    font-size: 22px;
+}
+
+.loading-icon {
+    animation: rotation 1s linear infinite;
+}
+
+@keyframes rotation {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* =========================================================
+   FOOTER
+========================================================= */
+
+.levees-footer {
+    min-height: 60px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 0 20px;
+
+    background: var(--lv-surface-soft);
+
+    border-top: 1px solid var(--lv-border);
+
+    color: var(--lv-text-muted);
+    font-size: 11px;
+    font-weight: 800;
+
+    letter-spacing: 0.5px;
+}
+
+/* =========================================================
+   RESPONSIVE TABLETTE
+========================================================= */
+
+@media (max-width: 1200px) {
+    .levees-page {
+        padding: 25px;
+    }
+
+    .levees-board {
+        overflow-x: auto;
+    }
+
+    .levees-columns,
+    .levee-row {
+        min-width: 1050px;
+    }
+}
+
+/* =========================================================
+   RESPONSIVE TABLETTE PETITE
+========================================================= */
+
+@media (max-width: 900px) {
+    .levees-header {
+        min-height: 105px;
+        padding: 20px;
+        flex-wrap: wrap;
+    }
+
+    .levees-title,
+    .levees-date {
+        width: 100%;
+    }
+
+    .levees-date {
+        align-items: flex-start;
+        margin-top: 8px;
+    }
+
+    .levees-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .levees-search {
+        width: 100%;
+    }
+
+    .levees-filter {
+        flex: 1;
+    }
+
+    .levees-filter select {
+        flex: 1;
+    }
+}
+
+/* =========================================================
+   RESPONSIVE MOBILE
+========================================================= */
+
+@media (max-width: 600px) {
+    .levees-page {
+        padding: 16px;
+    }
+
+    .levees-header {
+        align-items: flex-start;
+        flex-direction: column;
+
+        padding: 20px;
+    }
+
+    .levees-title strong {
+        font-size: 18px;
+        letter-spacing: 1px;
+    }
+
+    .levees-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .levees-search {
+        width: 100%;
+    }
+
+    .levees-filter {
+        width: 100%;
+    }
+
+    .levees-filter select {
+        width: 100%;
+    }
+
+    .levees-week-nav {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .week-btn-today {
+        flex: 1;
+    }
+
+    .levees-refresh {
+        width: 100%;
+    }
+
+    .departure-banner {
+        padding: 18px;
+        min-height: 100px;
+    }
+
+    .departure-number {
+        display: none;
+    }
+
+    .levees-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 5px;
+
+        padding: 15px 18px;
+    }
+
+    /* =====================================================
+   LEVÉE TERMINÉE (ligne grisée)
+===================================================== */
+
+.levee-row.levee-terminee {
+    opacity: 0.55;
+    background: #f8f6fa;
+}
+
+.levee-row.levee-terminee .levee-defunt strong {
+    color: #a10e0e;
+}
+
+/* =====================================================
+   STATUT TERMINÉ
+===================================================== */
+
+.levee-status.termine {
+    background: #e8e6ec;
+    color: #a10e0e;
+}
+
+.levee-status.termine .status-dot {
+    background: #a10e0e;
+}
+
+/* =====================================================
+   STATUT CONFIRMÉ (vert)
+===================================================== */
+
+.levee-status.confirme {
+    background: #e7f7ee;
+    color: #248454;
+}
+
+.levee-status.confirme .status-dot {
+    background: #248454;
+}
+
+/* =====================================================
+   STATUT EN ATTENTE (orange)
+===================================================== */
+
+.levee-status.attente {
+    background: #fff4dc;
+    color: #b47b00;
+}
+
+.levee-status.attente .status-dot {
+    background: #b47b00;
+}
+
+/* =====================================================
+   STATUT PLANIFIÉ (violet)
+===================================================== */
+
+.levee-status.planifie {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+.levee-status.planifie .status-dot {
+    background: #6d28d9;
+}
+}

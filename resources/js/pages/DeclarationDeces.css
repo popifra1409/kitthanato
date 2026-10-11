@@ -1,0 +1,813 @@
+/* ===================== RESET ===================== */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: "Arial", sans-serif;
+    background-color: #e0e0e0;
+    color: #333;
+    line-height: 1.4;
+}
+
+/* Padding uniquement à l'écran (pas à l'impression) */
+@media screen {
+    body {
+        padding: 20px;
+    }
+}
+
+.form-container {
+    max-width: 210mm;
+    margin: 0 auto;
+}
+
+/* ===================== PAGES A4 ===================== */
+.page {
+    position: relative;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 12mm 15mm 20mm 15mm;
+    margin: 0 auto 20px auto;
+    background: #fff;
+    border: 1px solid #999;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);
+    overflow: visible;
+}
+
+/* ===================== PIED DE PAGE ===================== */
+.footer {
+    position: absolute;
+    bottom: 8mm;
+    right: 15mm;
+    font-size: 0.65rem;
+    font-weight: bold;
+    font-style: italic;
+    color: #333;
+}
+
+/* ===================== EN-TÊTE ===================== */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.header-left,
+.header-right {
+    flex: 1;
+    font-size: 0.65rem;
+}
+
+.header-left p,
+.header-right p {
+    margin-bottom: 1px;
+    line-height: 1.3;
+}
+
+.header-right p {
+    text-align: right;
+}
+
+.header-center {
+    flex: 0 0 auto;
+    padding: 0 8px;
+}
+
+.header-center img {
+    width: 100px;
+    height: auto;
+}
+
+/* ===================== TITRE ===================== */
+.title-box {
+    text-align: center;
+    background-color: #999;
+    padding: 6px 0;
+    margin-top: 8px;
+}
+
+.title-box h1 {
+    font-size: 1rem;
+    text-transform: uppercase;
+    margin: 0;
+    font-weight: bold;
+    color: #000;
+}
+
+.partie {
+    background-color: #000;
+    padding: 3px 0;
+    margin-top: 8px;
+}
+
+.title-sub {
+    font-size: 0.6rem;
+    font-style: italic;
+    margin-top: 0;
+    text-align: center;
+    color: #f0f0f0;
+}
+
+/* ===================== TABLEAUX ===================== */
+.section-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+    font-size: 0.6rem;
+    page-break-inside: avoid;
+}
+
+.section-table td {
+    border: 1px solid #000;
+    padding: 3px 5px;
+    vertical-align: middle;
+}
+
+.section-table .section-title {
+    font-weight: bold;
+    background-color: #8d8989;
+    text-align: center;
+    color: #fff;
+    font-size: 0.65rem;
+    padding: 6px 8px;
+    text-transform: uppercase;
+}
+.section-title4{
+text-align: center;
+    font-weight: bold;
+    font-size: 0.7rem;
+    padding: 5px;
+    border: 1px solid #000;
+    border-bottom: none;
+    background-color: #868484;
+    color: #0c0c0c;
+    text-transform: uppercase;
+}
+
+/* ===================== TITRE INSTRUCTIONS ===================== */
+.instruction-title {
+    background-color: #000;
+    color: #f0f0f0;
+    text-align: center;
+    font-weight: bold;
+    padding: 6px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    margin-bottom: 15px;
+}
+
+.section-table .label {
+    font-weight: bold;
+    white-space: nowrap;
+    background-color: #f9f9f9;
+    font-size: 0.6rem;
+    width: 1%;
+}
+
+/* ===================== INPUTS ===================== */
+.section-table input[type="text"],
+.section-table input[type="date"],
+.section-table input[type="time"],
+.section-table input[type="tel"] {
+    border: none;
+    background: transparent;
+    width: 100%;
+    padding: 0 2px;
+    font-size: 0.6rem;
+    outline: none;
+    font-family: inherit;
+}
+
+.section-table input:focus {
+    background-color: #fffbe6;
+}
+
+/* ===================== VALEURS IMPRIMÉES ===================== */
+.print-value {
+    display: inline-block;
+    padding: 2px 4px;
+    min-height: 18px;
+    min-width: 60px;
+    color: #000;
+    font-size: 0.6rem;
+    word-break: break-word;
+    max-width: 100%;
+}
+
+/* ===================== CASES CARRÉES ===================== */
+.section-table label,
+.s5-table label {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 8px;
+    font-weight: normal;
+    font-size: 0.58rem;
+    cursor: pointer;
+    position: relative;
+}
+
+.section-table input[type="radio"],
+.s5-table input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.square-box {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1px solid #000;
+    background: #fff;
+    margin-right: 4px;
+    flex-shrink: 0;
+    position: relative;
+    vertical-align: middle;
+}
+
+.section-table input[type="radio"]:checked + .square-box::after,
+.s5-table input[type="checkbox"]:checked + .square-box::after {
+    content: "";
+    position: absolute;
+    top: 1.5px;
+    left: 1.5px;
+    width: 5px;
+    height: 5px;
+    background: #000;
+}
+
+/* ===================== SECTION 3 ===================== */
+.section3-table .attestation-cell {
+    font-size: 0.58rem;
+    font-style: italic;
+    background-color: #f5f5f5;
+    padding: 8px;
+    vertical-align: middle;
+    text-align: center;
+    width: 45%;
+}
+
+.section3-table .attestation-cell p {
+    margin-bottom: 6px;
+}
+
+.section3-table .signature-cell {
+    font-size: 0.58rem;
+    padding: 8px;
+    vertical-align: top;
+    width: 30%;
+}
+
+.section3-table .signature-cell span {
+    display: block;
+    font-size: 0.56rem;
+    margin-bottom: 4px;
+}
+
+.section3-table .signature-cell input {
+    border: none;
+    border-bottom: 1px solid #333;
+    background: transparent;
+    width: 100%;
+    margin-top: 3px;
+    font-size: 0.58rem;
+    outline: none;
+}
+
+.section3-table .date-cell {
+    font-size: 0.58rem;
+    padding: 8px;
+    vertical-align: top;
+    width: 25%;
+}
+
+.section3-table .date-cell span {
+    display: block;
+    font-size: 0.56rem;
+    margin-bottom: 4px;
+}
+
+.section3-table .date-cell input {
+    border: none;
+    border-bottom: 1px solid #333;
+    background: transparent;
+    width: 100%;
+    margin-top: 3px;
+    font-size: 0.58rem;
+    outline: none;
+}
+
+/* ===================== SECTION 4 ===================== */
+.section4-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+    font-size: 0.6rem;
+    page-break-inside: avoid;
+}
+
+.section4-table td {
+    border: 1px solid #000;
+    padding: 4px 6px;
+    vertical-align: top;
+}
+
+.section4-table .section-title {
+    font-weight: bold;
+    background-color: #8d8989;
+    text-align: center;
+    color: #fff;
+    font-size: 0.65rem;
+    padding: 6px 8px;
+    text-transform: uppercase;
+}
+
+.officier-text-cell {
+    width: 60%;
+    vertical-align: top;
+    padding: 8px;
+}
+
+.officier-intro {
+    font-size: 0.6rem;
+    margin-bottom: 10px;
+}
+
+.officier-line {
+    font-size: 0.6rem;
+    margin-bottom: 8px;
+    white-space: nowrap;
+}
+
+.dotted-line {
+    display: inline-block;
+    width: 55%;
+    border-bottom: 1.5px dashed #333;
+    margin-left: 5px;
+    height: 10px;
+    vertical-align: bottom;
+}
+
+.officier-signature-cell {
+    width: 15%;
+    text-align: left;
+    vertical-align: top;
+    padding: 8px;
+    font-size: 0.6rem;
+}
+
+.officier-date-cell {
+    width: 25%;
+    text-align: left;
+    vertical-align: top;
+    padding: 8px;
+    font-size: 0.6rem;
+    line-height: 1.4;
+}
+
+/* ===================== INSTRUCTIONS PAGE 2 ===================== */
+.instructions-page {
+    font-size: 0.55rem;
+    padding: 10mm 12mm 18mm 12mm;
+}
+
+.instructions-content {
+    font-size: 0.55rem;
+    line-height: 1.3;
+}
+
+.instructions-content p {
+    margin-bottom: 4px;
+    text-align: justify;
+    font-size: 0.55rem;
+    line-height: 1.3;
+}
+
+.instructions-content h3 {
+    font-size: 0.65rem;
+    margin: 8px 0 4px;
+    color: #000;
+}
+
+.instructions-content strong {
+    font-weight: bold;
+}
+
+/* ===================== PAGE 3 : SECTION 5 ===================== */
+.section5-page {
+    padding: 8mm 10mm 16mm 10mm;
+}
+
+.s5-top-banner {
+    text-align: center;
+    font-weight: bold;
+    font-style: italic;
+    font-size: 0.65rem;
+    padding: 4px;
+    border: 1px solid #000;
+    border-bottom: none;
+    background-color: #fff;
+}
+
+.s5-section-title {
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.7rem;
+    padding: 5px;
+    border: 1px solid #000;
+    border-bottom: none;
+    background-color: #868484;
+    color: #0c0c0c;
+    text-transform: uppercase;
+}
+.section-title1{
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.7rem;
+    padding: 5px;
+    border: 1px solid #000;
+    border-bottom: none;
+    background-color: #868484;
+    color: #0c0c0c;
+    text-transform: uppercase;
+}
+.section-title2{
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.7rem;
+    padding: 5px;
+    border: 1px solid #000;
+    border-bottom: none;
+    background-color: #868484;
+    color: #0c0c0c;
+    text-transform: uppercase;
+}
+.section-title3{
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.7rem;
+    padding: 5px;
+    border: 1px solid #000;
+    border-bottom: none;
+    background-color: #868484;
+    color: #0c0c0c;
+    text-transform: uppercase;
+}
+
+.s5-report {
+    text-align: left;
+    font-weight: bold;
+    font-style: italic;
+    font-size: 0.65rem;
+    padding: 5px 8px;
+    border: 1px solid #000;
+    background-color: #fff;
+}
+
+.s5-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0;
+    font-size: 0.58rem;
+}
+
+.s5-table td {
+    border: 1px solid #000;
+    padding: 3px 5px;
+    vertical-align: middle;
+}
+
+.s5-label {
+    font-weight: bold;
+    white-space: nowrap;
+    background-color: #f9f9f9;
+    width: 1%;
+}
+
+.s5-sub-title {
+    font-weight: bold;
+    background-color: #e8e8e8;
+    text-align: left;
+    font-size: 0.62rem;
+    padding: 4px 6px;
+}
+
+.s5-table input[type="text"] {
+    border: none;
+    background: transparent;
+    width: 100%;
+    padding: 1px 2px;
+    font-size: 0.58rem;
+    outline: none;
+    font-family: inherit;
+}
+
+.s5-table input[type="text"]:focus {
+    background-color: #fffbe6;
+}
+
+.s5-inline {
+    font-style: italic;
+    font-size: 0.55rem;
+    margin: 0 6px;
+    color: #333;
+}
+
+/* ===================== CADRE A ===================== */
+.s5-cause-text {
+    font-size: 0.56rem;
+    padding: 6px;
+    vertical-align: top;
+    width: 38%;
+}
+
+.s5-cause-text p {
+    margin-bottom: 6px;
+}
+
+.s5-arrow-cell {
+    width: 8%;
+    text-align: center;
+    vertical-align: middle;
+    background-color: #f5f5f5;
+    padding: 4px 2px;
+}
+
+.s5-arrows {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 48px;
+}
+
+.curved-arrow-icon {
+    width: 30px;
+    height: 45px;
+    display: block;
+    margin: 0 auto;
+}
+
+.s5-cause-header,
+.s5-interval-header {
+    font-weight: bold;
+    font-size: 0.58rem;
+    background-color: #f0f0f0;
+    text-align: center;
+    padding: 4px;
+}
+
+.s5-letter {
+    font-weight: bold;
+    margin-right: 4px;
+    font-size: 0.62rem;
+}
+
+.s5-due {
+    font-style: italic;
+    font-size: 0.53rem;
+    color: #555;
+    margin: 0 4px;
+}
+
+.s5-question {
+    font-size: 0.56rem;
+    padding: 5px 6px;
+    vertical-align: middle;
+}
+
+.s5-check {
+    font-size: 0.56rem;
+    padding: 5px 6px;
+    vertical-align: middle;
+}
+
+.s5-boxes {
+    display: inline-flex;
+    gap: 3px;
+    margin-left: 6px;
+}
+
+.s5-box {
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    border: 1px solid #000;
+    background: #fff;
+}
+
+.s5-signature {
+    margin-top: 15px;
+}
+
+.s5-sig-label {
+    font-weight: bold;
+    background-color: #f9f9f9;
+    font-size: 0.58rem;
+    padding: 5px 6px;
+}
+
+.s5-signature input[type="text"] {
+    border-bottom: 1px solid #333;
+    padding: 4px 2px;
+}
+
+/* =========================================================
+   CONTENEUR D'IMPRESSION
+========================================================= */
+
+.declaration-print-container {
+    display: none;
+}
+
+/* =========================================================
+   IMPRESSION — 3 PAGES EXACTES
+========================================================= */
+
+@media print {
+    /* Forcer les couleurs de fond */
+    *,
+    *::before,
+    *::after {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+    }
+
+    /* Masquer tout par défaut */
+    body * {
+        visibility: hidden;
+    }
+
+    /* Afficher uniquement le conteneur d'impression */
+    .declaration-print-container,
+    .declaration-print-container * {
+        visibility: visible;
+    }
+
+    .declaration-print-container {
+        display: block !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+    }
+
+    /* Masquer le reste de l'application */
+    .navbar,
+    .btn-primary,
+    .btn-secondary,
+    .declaration-actions,
+    .declaration-toolbar,
+    .declaration-modal-overlay,
+    .declaration-header,
+    .declaration-stats,
+    .declaration-alert,
+    .declaration-search,
+    .declaration-card {
+        display: none !important;
+    }
+
+    /* Conteneur principal sans marge */
+    .form-container {
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+    }
+
+    /* ✅ Page A4 STRICTE - pas de marge externe */
+    .page {
+        width: 210mm !important;
+        height: 297mm !important;
+        min-height: 297mm !important;
+        max-height: 297mm !important;
+
+        margin: 0 !important;
+        padding: 10mm 12mm 18mm 12mm !important;
+
+        border: none !important;
+        box-shadow: none !important;
+
+        page-break-after: always !important;
+        break-after: page !important;
+
+        overflow: hidden !important;
+        position: relative;
+        background: #fff !important;
+    }
+
+    /* Dernière page = PAS de saut après */
+    .page:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+    }
+
+    /* Éviter les coupures dans les sections */
+    .section-table,
+    .section4-table,
+    .s5-table {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    /* Réduire l'espace entre les sections */
+    .section-table {
+        margin-bottom: 6px !important;
+    }
+
+    .section4-table {
+        margin-bottom: 8px !important;
+    }
+
+    /* Format papier A4 sans marges navigateur */
+    @page {
+        size: A4 portrait;
+        margin: 0;
+    }
+
+    /* Retirer les marges par défaut */
+    html,
+    body {
+        width: 210mm;
+        height: auto;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+    }
+}
+
+/* ===================== RESPONSIVE ===================== */
+@media screen and (max-width: 768px) {
+    .page {
+        width: 100%;
+        min-height: auto;
+        padding: 15px;
+    }
+
+    .header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .header-right p {
+        text-align: center;
+    }
+
+    .header-center {
+        order: -1;
+    }
+
+    .section-table td,
+    .section4-table td {
+        display: block;
+        width: 100% !important;
+        border: 1px solid #000;
+    }
+
+    .section-table .label {
+        background-color: #f0f0f0;
+    }
+
+    .section-table label {
+        display: block;
+        margin-bottom: 3px;
+    }
+
+    .section3-table .attestation-cell,
+    .section3-table .signature-cell,
+    .section3-table .date-cell {
+        width: 100%;
+    }
+
+    .dotted-line {
+        width: 100%;
+        margin-left: 0;
+        margin-top: 3px;
+    }
+
+    .s5-table td {
+        display: block;
+        width: 100% !important;
+    }
+
+    .s5-cause-text,
+    .s5-arrow-cell,
+    .s5-cause-header,
+    .s5-interval-header {
+        width: 100% !important;
+    }
+
+    .s5-arrows {
+        flex-direction: row;
+        justify-content: center;
+    }
+}

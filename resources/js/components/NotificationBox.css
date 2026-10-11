@@ -1,0 +1,170 @@
+/* =========================================================
+   OVERLAY
+========================================================= */
+
+.notif-overlay {
+    position: fixed;
+    inset: 0;
+
+    z-index: 10000;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    background: rgba(28, 18, 42, 0.35);
+    backdrop-filter: blur(3px);
+
+    animation: notifFadeIn 0.2s ease;
+}
+
+@keyframes notifFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* =========================================================
+   MODALE
+========================================================= */
+
+.notif-modal {
+    width: 100%;
+    max-width: 380px;
+
+    padding: 32px 28px 26px;
+
+    background: #ffffff;
+
+    border-radius: 20px;
+
+    text-align: center;
+
+    box-shadow:
+        0 24px 60px rgba(28, 18, 42, 0.28);
+
+    animation: notifPop 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+
+    position: relative;
+    overflow: hidden;
+}
+
+@keyframes notifPop {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* =========================================================
+   ICÔNE
+========================================================= */
+
+.notif-icon {
+    width: 72px;
+    height: 72px;
+
+    margin: 0 auto 18px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    font-size: 38px;
+    font-weight: 800;
+    line-height: 1;
+
+    animation: notifIconPop 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+@keyframes notifIconPop {
+    0%   { transform: scale(0); }
+    60%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
+}
+
+/* SUCCESS */
+.notif-success .notif-icon {
+    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+    color: #15803d;
+
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.08);
+}
+
+/* ERROR */
+.notif-error .notif-icon {
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    color: #b91c1c;
+
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.08);
+}
+
+/* =========================================================
+   TITRE / MESSAGE
+========================================================= */
+
+.notif-title {
+    margin: 0 0 8px;
+
+    font-size: 20px;
+    font-weight: 800;
+
+    color: #2c1f3f;
+}
+
+.notif-message {
+    margin: 0;
+
+    color: #6a5f78;
+
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+/* =========================================================
+   BARRE DE PROGRESSION
+========================================================= */
+
+.notif-progress {
+    position: absolute;
+
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    height: 4px;
+
+    background: #f0ebf5;
+
+    overflow: hidden;
+}
+
+.notif-progress-bar {
+    height: 100%;
+
+    width: 100%;
+
+    animation-name: notifProgress;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+}
+
+.notif-success .notif-progress-bar {
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.notif-error .notif-progress-bar {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+@keyframes notifProgress {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-100%); }
+}

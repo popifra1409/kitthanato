@@ -1,0 +1,842 @@
+/* =========================================================
+   PAGE TRANSFERTS
+========================================================= */
+
+.transfert-page {
+    min-height: 100vh;
+    background: #f5f6fa;
+    padding: 25px 30px;
+    color: #2f3047;
+    box-sizing: border-box;
+}
+
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.transfert-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+}
+
+.transfert-brand {
+    font-size: 20px;
+    font-weight: 800;
+    color: #6c4ab6;
+    letter-spacing: 1px;
+}
+
+.transfert-title {
+    font-size: 30px;
+    font-weight: 800;
+    color: #4c1d95;
+  letter-spacing: -0.5px;
+}
+
+.transfert-count {
+    background: #f0ebff;
+    color: #6c4ab6;
+
+    padding: 9px 15px;
+    border-radius: 20px;
+
+    font-size: 12px;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   BARRE OUTILS
+========================================================= */
+
+.transfert-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+
+    
+
+    padding: 18px;
+
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
+
+    margin-bottom: 20px;
+}
+
+
+/* =========================================================
+   RECHERCHE
+========================================================= */
+
+.transfert-search {
+    flex: 1;
+
+    display: flex;
+    align-items: center;
+
+    background: #f7f7fb;
+
+    border: 1px solid #e4e3ed;
+    border-radius: 9px;
+
+    height: 45px;
+}
+
+.transfert-search span {
+    font-size: 22px;
+    margin-left: 14px;
+    color: #77758a;
+}
+
+.transfert-search input {
+    flex: 1;
+
+    border: none;
+    outline: none;
+
+    background: transparent;
+
+    padding: 0 12px;
+
+    font-size: 14px;
+    color: #333;
+}
+
+.transfert-search input::placeholder {
+    color: #9999a8;
+}
+
+
+/* =========================================================
+   FILTRE
+========================================================= */
+
+.transfert-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.transfert-filter label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #77758a;
+}
+
+.transfert-filter select {
+    height: 45px;
+
+    padding: 0 12px;
+
+    border: 1px solid #e1dfeb;
+    border-radius: 9px;
+
+    background: #ffffff;
+
+    color: #36364a;
+
+    outline: none;
+
+    cursor: pointer;
+}
+
+
+/* =========================================================
+   BOUTON NOUVEAU
+========================================================= */
+
+.new-transfert-button {
+    height: 45px;
+
+    padding: 0 20px;
+
+    border: none;
+    border-radius: 9px;
+
+    background: #6c4ab6;
+    color: white;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition: 0.2s ease;
+}
+
+.new-transfert-button:hover {
+    background: #59399e;
+    transform: translateY(-1px);
+}
+
+
+/* =========================================================
+   TABLEAU
+========================================================= */
+
+.transfert-board {
+    background: #ffffff;
+
+    border-radius: 14px;
+
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
+
+    overflow: hidden;
+}
+
+/* ===== Conteneur du menu ===== */
+.transfert-actions-menu {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* ===== Bouton trois points ===== */
+.actions-menu-trigger {
+    background: transparent;
+    border: none;
+    font-size: 22px;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 6px;
+    color: #4b5563;
+    transition: background 0.15s, color 0.15s;
+}
+
+.actions-menu-trigger:hover {
+    background: #f3f4f6;
+    color: #111827;
+}
+
+/* ===== Dropdown ===== */
+.actions-menu-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    min-width: 160px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    padding: 4px;
+    z-index: 100;
+    animation: fadeInMenu 0.12s ease-out;
+}
+
+@keyframes fadeInMenu {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Items du menu ===== */
+.actions-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #374151;
+    text-align: left;
+    transition: background 0.12s, color 0.12s;
+}
+
+.actions-menu-item.edit:hover {
+    background: #fffbeb;
+    color: #b45309;
+}
+
+.actions-menu-item.delete:hover {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+/* =========================================================
+   COLONNES
+========================================================= */
+
+.transfert-columns {
+    display: grid;
+
+    grid-template-columns:
+        1fr
+        0.8fr
+        1fr
+        1.4fr
+        1.4fr
+        1.5fr
+        1.2fr
+        0.8fr
+        100px;
+
+    align-items: center;
+
+    min-height: 55px;
+
+    padding: 0 20px;
+
+    background: #f7f5fc;
+
+    border-bottom: 1px solid #e8e6ef;
+
+    color: #77758a;
+
+    font-size: 10px;
+    font-weight: 800;
+
+    letter-spacing: 0.6px;
+}
+
+
+/* =========================================================
+   LIGNES
+========================================================= */
+
+.transfert-row {
+    display: grid;
+
+    grid-template-columns:
+        1fr
+        0.8fr
+        1fr
+        1.4fr
+        1.4fr
+        1.5fr
+        1.2fr
+        0.8fr
+        100px;
+
+    align-items: center;
+
+    min-height: 70px;
+
+    padding: 0 20px;
+
+    border-bottom: 1px solid #eeeeF3;
+
+    font-size: 13px;
+
+    transition: background 0.2s ease;
+}
+
+.transfert-row:hover {
+    background: #faf9fd;
+}
+
+
+/* =========================================================
+   HEURE
+========================================================= */
+
+.transfert-time {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.transfert-time strong {
+    font-size: 14px;
+    color: #36364a;
+}
+
+.transfert-time small {
+    font-size: 9px;
+    color: #aaa8b7;
+}
+
+
+/* =========================================================
+   CODE
+========================================================= */
+
+.transfert-code {
+    display: inline-block;
+
+    background: #f0ebff;
+
+    color: #6c4ab6;
+
+    padding: 6px 9px;
+
+    border-radius: 6px;
+
+    font-size: 11px;
+    font-weight: 800;
+}
+
+
+/* =========================================================
+   DÉFUNT
+========================================================= */
+
+.transfert-defunt {
+    font-weight: 700;
+    color: #333448;
+}
+
+
+/* =========================================================
+   DESTINATION
+========================================================= */
+
+.transfert-destination {
+    color: #555568;
+}
+
+
+/* =========================================================
+   STATUT
+========================================================= */
+
+.transfert-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+
+    padding: 6px 10px;
+
+    border-radius: 20px;
+
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.transfert-status.validated {
+    background: #e7f7ee;
+    color: #248454;
+}
+
+.transfert-status.waiting {
+    background: #fff4dc;
+    color: #b47b00;
+}
+
+
+/* =========================================================
+   ACTIONS
+========================================================= */
+
+.transfert-actions {
+    display: flex;
+    gap: 7px;
+}
+
+.transfert-actions button {
+    width: 32px;
+    height: 32px;
+
+    border: none;
+
+    border-radius: 7px;
+
+    background: #f1eff8;
+
+    color: #6c4ab6;
+
+    cursor: pointer;
+
+    font-size: 16px;
+
+    transition: 0.2s ease;
+}
+
+.transfert-actions button:hover {
+    background: #6c4ab6;
+    color: white;
+}
+
+.transfert-actions button.delete {
+    color: #d34b4b;
+    background: #fff0f0;
+}
+
+.transfert-actions button.delete:hover {
+    background: #d34b4b;
+    color: white;
+}
+
+
+/* =========================================================
+   AUCUN RÉSULTAT
+========================================================= */
+
+.transfert-empty {
+    text-align: center;
+
+    padding: 60px 20px;
+
+    color: #9997a7;
+
+    font-size: 12px;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   FOOTER
+========================================================= */
+
+.transfert-footer {
+    padding: 15px 20px;
+
+    background: #faf9fc;
+
+    color: #888696;
+
+    font-size: 11px;
+    font-weight: 600;
+}
+
+
+/* =========================================================
+   MODAL
+========================================================= */
+
+.transfert-modal-background {
+    position: fixed;
+
+    inset: 0;
+
+    background: rgba(25, 22, 38, 0.55);
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    z-index: 1000;
+}
+
+
+/* =========================================================
+   CONTENU MODAL
+========================================================= */
+
+.transfert-modal {
+    width: 100%;
+    max-width: 760px;
+
+    max-height: 90vh;
+
+    overflow-y: auto;
+
+    background: #ffffff;
+
+    border-radius: 16px;
+
+    box-shadow: 0 15px 45px rgba(0, 0, 0, 0.2);
+
+    animation: transfertModalAppear 0.2s ease;
+}
+
+@keyframes transfertModalAppear {
+
+    from {
+        opacity: 0;
+        transform: translateY(15px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+}
+
+
+/* =========================================================
+   HEADER MODAL
+========================================================= */
+
+.transfert-modal-header {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 22px 25px;
+
+    background: #6c4ab6;
+
+    color: white;
+}
+
+.transfert-modal-header span {
+    font-size: 10px;
+
+    font-weight: 700;
+
+    opacity: 0.8;
+
+    letter-spacing: 1px;
+}
+
+.transfert-modal-header h2 {
+    margin: 5px 0 0;
+
+    font-size: 20px;
+
+    font-weight: 800;
+}
+
+.transfert-close {
+    width: 35px;
+    height: 35px;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background: rgba(255, 255, 255, 0.15);
+
+    color: white;
+
+    font-size: 23px;
+
+    cursor: pointer;
+}
+
+.transfert-close:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+
+/* =========================================================
+   FORMULAIRE
+========================================================= */
+
+.transfert-modal form {
+    padding: 25px;
+}
+
+.transfert-form-grid {
+    display: grid;
+
+    grid-template-columns: repeat(2, 1fr);
+
+    gap: 20px;
+}
+
+.transfert-input-group {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 7px;
+}
+
+.transfert-input-group label {
+    font-size: 11px;
+
+    font-weight: 800;
+
+    color: #5f5d70;
+
+    letter-spacing: 0.5px;
+}
+
+.transfert-input-group input,
+.transfert-input-group select {
+    width: 100%;
+
+    height: 45px;
+
+    box-sizing: border-box;
+
+    padding: 0 13px;
+
+    border: 1px solid #dddbe7;
+
+    border-radius: 8px;
+
+    background: #fafafd;
+
+    color: #333448;
+
+    font-size: 13px;
+
+    outline: none;
+
+    transition: 0.2s ease;
+}
+
+.transfert-input-group input:focus,
+.transfert-input-group select:focus {
+    border-color: #6c4ab6;
+
+    background: white;
+
+    box-shadow: 0 0 0 3px rgba(108, 74, 182, 0.08);
+}
+
+.transfert-input-group input::placeholder {
+    color: #aaa8b5;
+}
+
+
+/* =========================================================
+   BOUTONS FORMULAIRE
+========================================================= */
+
+.transfert-form-buttons {
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 12px;
+
+    margin-top: 30px;
+
+    padding-top: 20px;
+
+    border-top: 1px solid #eeeeF3;
+}
+
+.transfert-cancel,
+.transfert-save {
+    height: 43px;
+
+    padding: 0 20px;
+
+    border-radius: 8px;
+
+    font-size: 11px;
+
+    font-weight: 800;
+
+    cursor: pointer;
+
+    transition: 0.2s ease;
+}
+
+.transfert-cancel {
+    background: #f2f1f6;
+
+    border: 1px solid #e1dfe9;
+
+    color: #666475;
+}
+
+.transfert-cancel:hover {
+    background: #e8e6ee;
+}
+
+.transfert-save {
+    background: #6c4ab6;
+
+    border: 1px solid #6c4ab6;
+
+    color: white;
+}
+
+.transfert-save:hover {
+    background: #59399e;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 900px) {
+
+    .transfert-page {
+        padding: 20px;
+    }
+
+    .transfert-board {
+        overflow-x: auto;
+    }
+}
+
+    .transfert-columns  {
+        height: 12;
+        padding: 15px 10px;
+
+  border-bottom: 2px solid #ddd6fe;
+
+  color: #4c1d95;
+  font-size: 14px;
+  font-weight: 800;
+
+  text-align: left;
+  white-space: nowrap;
+
+  text-transform: uppercase;
+  letter-spacing: 0.1px;
+    }
+
+
+
+
+@media (max-width: 800px) {
+
+    .transfert-header {
+        flex-direction: column;
+
+        align-items: flex-start;
+
+        gap: 12px;
+    }
+
+    .transfert-toolbar {
+        flex-direction: column;
+
+        align-items: stretch;
+    }
+
+    .transfert-filter {
+        justify-content: space-between;
+    }
+
+    .new-transfert-button {
+        width: 100%;
+    }
+
+    .transfert-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+
+@media (max-width: 500px) {
+
+    .transfert-page {
+        padding: 12px;
+    }
+
+    .transfert-modal-background {
+        padding: 10px;
+    }
+
+    .transfert-modal form {
+        padding: 18px;
+    }
+
+    .transfert-modal-header {
+        padding: 18px;
+    }
+
+    .transfert-form-buttons {
+        flex-direction: column;
+    }
+
+    .transfert-cancel,
+    .transfert-save {
+        width: 100%;
+    }
+
+}
