@@ -17,7 +17,7 @@ class TransfertController extends Controller
     public function index()
     {
         return response()->json(
-            Transfert::with('depot')
+            Transfert::with(['depot', ...Transfert::TRACE])
                 ->orderByDesc('date')
                 ->orderByDesc('heure')
                 ->get()

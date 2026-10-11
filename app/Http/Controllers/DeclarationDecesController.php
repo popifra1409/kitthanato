@@ -17,7 +17,7 @@ class DeclarationDecesController extends Controller
 
     public function index(Request $request)
     {
-        $query = DeclarationDeces::with('depot')
+        $query = DeclarationDeces::with(['depot', ...DeclarationDeces::TRACE])
             ->orderByDesc('created_at');
 
         if ($request->filled('search')) {
@@ -324,7 +324,7 @@ class DeclarationDecesController extends Controller
     public function show($id)
     {
         return response()->json(
-            DeclarationDeces::with('depot')
+            DeclarationDeces::with(['depot', ...DeclarationDeces::TRACE])
                 ->findOrFail($id)
         );
     }
@@ -372,10 +372,17 @@ class DeclarationDecesController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $declaration =
             DeclarationDeces::findOrFail($id);
+
+        $this->mettreEnCorbeille(
+            'DECLARATION',
+            $declaration->id,
+            $declaration->toArray(),
+            $request->input('raison')
+        );
 
         $declaration->delete();
 

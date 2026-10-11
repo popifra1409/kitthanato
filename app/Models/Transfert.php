@@ -2,10 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsActivity;
+use App\Models\Concerns\TracksUser;
 use Illuminate\Database\Eloquent\Model;
 
 class Transfert extends Model
 {
+    use TracksUser, LogsActivity;
+
+    protected string $auditModule = 'TRANSFERTS';
+
     protected $fillable = [
         'date',
         'heure',

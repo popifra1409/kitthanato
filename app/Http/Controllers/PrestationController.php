@@ -19,7 +19,7 @@ class PrestationController extends Controller
     public function indexAdmin()
     {
         return response()->json(
-            Prestation::orderBy('nom')->get()
+            Prestation::with(Prestation::TRACE)->orderBy('nom')->get()
         );
     }
 
@@ -45,15 +45,6 @@ class PrestationController extends Controller
             'prix' => $data['prix'],
             'actif' => true,
         ]);
-
-        /*
-        $this->audit(
-            'PRESTATIONS',
-            'AJOUT',
-            "Ajout de la prestation {$prestation->nom}",
-            $prestation->toArray()
-        );
-        */
 
         return response()->json(
             $prestation,
@@ -87,25 +78,11 @@ class PrestationController extends Controller
             ],
         ]);
 
-        $ancien = $prestation->toArray();
-
         $prestation->update([
             'nom' => trim($data['nom']),
             'prix' => $data['prix'],
             'actif' => $data['actif'] ?? true,
         ]);
-
-        /*
-        $this->audit(
-            'PRESTATIONS',
-            'MODIFICATION',
-            "Modification de la prestation {$prestation->nom}",
-            [
-                'avant' => $ancien,
-                'apres' => $prestation->toArray(),
-            ]
-        );
-        */
 
         return response()->json($prestation);
     }
@@ -114,24 +91,11 @@ class PrestationController extends Controller
     {
         $prestation = Prestation::findOrFail($id);
 
-        $nom = $prestation->nom;
-
         // On désactive au lieu de supprimer
         // pour conserver l'historique.
         $prestation->update([
             'actif' => false,
         ]);
-
-        /*
-        $this->audit(
-            'PRESTATIONS',
-            'DESACTIVATION',
-            "Désactivation de la prestation {$nom}",
-            [
-                'prestation_id' => $id,
-            ]
-        );
-        */
 
         return response()->json([
             'message' => 'Prestation désactivée avec succès.'

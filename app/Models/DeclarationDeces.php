@@ -2,11 +2,20 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsActivity;
+use App\Models\Concerns\TracksUser;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class DeclarationDeces extends Model
 {
+    use TracksUser, LogsActivity;
+
+    protected string $auditModule = 'DECLARATIONS';
+
+    /* Signatures (images base64) : trop volumineuses pour le journal */
+    protected array $auditExclude = ['declarant_signature', 'responsable_signature'];
+
     use HasFactory;
 
     protected $table = 'declaration_deces';

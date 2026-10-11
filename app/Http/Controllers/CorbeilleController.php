@@ -14,7 +14,7 @@ class CorbeilleController extends Controller
     {
         $recherche = $request->query('recherche');
 
-        $query = Corbeille::with('user:id,name,role')
+        $query = Corbeille::with('user:id,name')
             ->orderByDesc('created_at');
 
         if ($recherche) {
@@ -38,7 +38,7 @@ class CorbeilleController extends Controller
     public function show($id)
     {
         return response()->json(
-            Corbeille::with('user:id,name,role')->findOrFail($id)
+            Corbeille::with('user:id,name')->findOrFail($id)
         );
     }
 

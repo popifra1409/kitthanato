@@ -40,4 +40,27 @@ class ServiceController extends Controller
 
         return response()->json($service, 201);
     }
+
+    public function update(Request $request, Service $service)
+    {
+        $request->merge(['nom' => trim((string) $request->input('nom'))]);
+
+        $validated = $request->validate([
+            'nom' => 'required|string|max:150|unique:services,nom,' . $service->id,
+        ], [
+            'nom.required' => 'Le nom du service est obligatoire.',
+            'nom.unique' => 'Ce service existe déjà.',
+        ]);
+
+        $service->update($validated);
+
+        return response()->json($service);
+    }
+
+    public function destroy(Service $service)
+    {
+        $service->delete();
+
+        return response()->json(['message' => 'Service supprimé.']);
+    }
 }

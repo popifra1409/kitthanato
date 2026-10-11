@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsActivity;
+use App\Models\Concerns\TracksUser;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Prestation;
 use App\Models\Sortie;
@@ -9,6 +11,15 @@ use App\Models\Transfert;
 
 class Depot extends Model
 {
+    use TracksUser, LogsActivity;
+
+    protected string $auditModule = 'DEPOTS';
+
+    public function auditLabel(): string
+    {
+        return "Dépôt {$this->code} – {$this->nom} {$this->prenom}";
+    }
+
     protected $table = 'depots';
 
     protected $fillable = [

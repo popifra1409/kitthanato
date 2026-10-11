@@ -7,6 +7,7 @@ use App\Models\Depot;
 use App\Models\Levee;
 use App\Models\Prestation;
 use App\Models\Chapelle;
+use App\Support\Audit;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,7 @@ class SortieController extends Controller
     public function index()
     {
         return response()->json(
-            Sortie::with('depot')
+            Sortie::with(['depot', ...Sortie::TRACE])
                 ->orderByDesc('date')
                 ->orderByDesc('heure')
                 ->get()
@@ -174,7 +175,7 @@ class SortieController extends Controller
         ]);
 
         return response()->json(
-            $sortie->fresh()->load('depot')
+            $sortie->fresh()->load(['depot', ...Sortie::TRACE])
         );
     }
 
@@ -184,76 +185,101 @@ class SortieController extends Controller
 
     public function paiement(Request $request, $id)
     {
-        $sortie = Sortie::findOrFail($id);
-
         $data = $request->validate([
-            'montant_paye' => ['required', 'numeric', 'min:0'],
+            'montant_paye' => ['required', 'numeric', 'gt:0'],
         ]);
 
-        /* Cumul du paiement */
-        $dejaPaye = (float) $sortie->montant_paye;
-        $nouveauPaiement = (float) $data['montant_paye'];
+        return DB::transaction(function () use ($data, $id) {
+            $sortie = Sortie::lockForUpdate()->findOrFail($id);
 
-        $montantPaye = min(
-            $dejaPaye + $nouveauPaiement,
-            (float) $sortie->montant_total
-        );
+            /* Cumul du paiement */
+            $dejaPaye = (float) $sortie->montant_paye;
+            $nouveauPaiement = (float) $data['montant_paye'];
 
-        $reste = max(
-            0,
-            (float) $sortie->montant_total - $montantPaye
-        );
+            $montantPaye = min(
+                $dejaPaye + $nouveauPaiement,
+                (float) $sortie->montant_total
+            );
 
-        /* Dès qu'un paiement est enregistré → VALIDÉ */
-        $statut = $montantPaye > 0 ? 'VALIDÉ' : 'EN COURS';
+            $reste = max(
+                0,
+                (float) $sortie->montant_total - $montantPaye
+            );
 
-        $sortie->update([
-            'montant_paye' => $montantPaye,
-            'reste_a_payer' => $reste,
-            'statut' => $statut,
-        ]);
+            /* Dès qu'un paiement est enregistré → VALIDÉ */
+            $statut = $montantPaye > 0 ? 'VALIDÉ' : 'EN COURS';
 
-        /* Créer la levée dès le premier paiement */
-        Levee::updateOrCreate(
-            ['sortie_id' => $sortie->id],
-            [
-                'date' => $sortie->date,
-                'heure' => $sortie->heure,
-                'chapelle' =>
-                    $sortie->chapelle_nom ??
-                    $sortie->chapelle ??
-                    null,
-                'statut' => 'PLANIFIÉ',
-            ]
-        );
+            $sortie->update([
+                'montant_paye' => $montantPaye,
+                'reste_a_payer' => $reste,
+                'statut' => $statut,
+            ]);
 
-        /* Le dépôt passe en SORTI dès le paiement */
-        Depot::where('id', $sortie->depot_id)->update([
-            'statut' => 'SORTI',
-            'date_sortie' => $sortie->date,
-        ]);
+            /* Créer la levée dès le premier paiement */
+            Levee::updateOrCreate(
+                ['sortie_id' => $sortie->id],
+                [
+                    'date' => $sortie->date,
+                    'heure' => $sortie->heure,
+                    'chapelle' =>
+                        $sortie->chapelle_nom ??
+                        $sortie->chapelle ??
+                        null,
+                    'statut' => 'PLANIFIÉ',
+                ]
+            );
 
-        return response()->json(
-            $sortie->fresh()->load('depot')
-        );
+            /* Le dépôt passe en SORTI dès le paiement */
+            Depot::findOrFail($sortie->depot_id)->update([
+                'statut' => 'SORTI',
+                'date_sortie' => $sortie->date,
+            ]);
+
+            /* Trace explicite de l'encaissement : qui, combien, quand */
+            Audit::log('SORTIES', 'PAIEMENT',
+                sprintf('Encaissement de %s FCFA sur la sortie #%d', number_format($montantPaye - $dejaPaye, 0, ',', ' '), $sortie->id),
+                [
+                    'montant_encaisse' => $montantPaye - $dejaPaye,
+                    'deja_paye' => $dejaPaye,
+                    'total_paye' => $montantPaye,
+                    'reste_a_payer' => $reste,
+                ],
+                $sortie
+            );
+
+            return response()->json(
+                $sortie->fresh()->load(['depot', ...Sortie::TRACE])
+            );
+        });
     }
 
     /* =========================================================
        SUPPRIMER UNE SORTIE
     ========================================================= */
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $sortie = Sortie::findOrFail($id);
 
-        $depotId = $sortie->depot_id;
+        if ((float) $sortie->montant_paye > 0) {
+            return response()->json([
+                'message' => 'Cette sortie a déjà un paiement enregistré. Elle ne peut plus être supprimée.',
+            ], 422);
+        }
 
-        $sortie->delete();
+        DB::transaction(function () use ($sortie, $request) {
+            $this->mettreEnCorbeille('SORTIE', $sortie->id, $sortie->toArray(), $request->input('raison'));
 
-        /* Le corps redevient disponible. */
-        Depot::where('id', $depotId)->update([
-            'statut' => 'PRÉSENT',
-        ]);
+            $depot = $sortie->depot;
+
+            $sortie->delete();
+
+            /* Le corps redevient disponible. */
+            $depot?->update([
+                'statut' => 'PRÉSENT',
+                'date_sortie' => null,
+            ]);
+        });
 
         return response()->json([
             'message' => 'Sortie supprimée avec succès.',

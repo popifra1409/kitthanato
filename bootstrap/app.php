@@ -14,11 +14,15 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
 
         $middleware->alias([
-            'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'permission' => \App\Http\Middleware\EnsurePermission::class,
+            'active' => \App\Http\Middleware\EnsureUserIsActive::class,
         ]);
 
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Les erreurs de l'API sont toujours renvoyées en JSON
+        $exceptions->shouldRenderJsonWhen(
+            fn ($request) => $request->is('api/*') || $request->expectsJson()
+        );
     })
     ->create();

@@ -4,14 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Models\Chapelle;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ChapelleController extends Controller
 {
+    /** GET /api/chapelles — chapelles actives (formulaires) */
     public function index()
     {
         return response()->json(
-            Chapelle::orderBy('nom')->get()
+            Chapelle::where('actif', true)->orderBy('nom')->get()
+        );
+    }
+
+    /** GET /api/chapelles-admin — toutes les chapelles + traçabilité */
+    public function indexAdmin()
+    {
+        return response()->json(
+            Chapelle::with(Chapelle::TRACE)->orderBy('nom')->get()
         );
     }
 
@@ -41,12 +49,17 @@ class ChapelleController extends Controller
         return response()->json($chapelle);
     }
 
+    /**
+     * DELETE /api/chapelles/{id}
+     * Désactivation (comme les prestations) : les sorties passées gardent
+     * leur référence et l'historique reste cohérent.
+     */
     public function destroy(Chapelle $chapelle)
     {
-        $chapelle->delete();
+        $chapelle->update(['actif' => false]);
 
         return response()->json([
-            'message' => 'Chapelle supprimée.'
+            'message' => 'Chapelle désactivée.'
         ]);
     }
 }
