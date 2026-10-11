@@ -8,9 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('transferts', function (Blueprint $table) {
-            $table->string('emplacement_destination')->nullable()->after('destination');
-        });
+        // Garde : la colonne existe déjà si create_transferts_table est récente.
+        if (!Schema::hasColumn('transferts', 'emplacement_destination')) {
+            Schema::table('transferts', function (Blueprint $table) {
+                $table->string('emplacement_destination')->nullable()->after('destination');
+            });
+        }
     }
 
     public function down(): void

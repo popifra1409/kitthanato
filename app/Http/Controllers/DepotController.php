@@ -20,7 +20,8 @@ class DepotController extends Controller
         $depots = Depot::with([
             'sorties',
             'transferts',
-            'prestations'
+            'prestations',
+            ...Depot::TRACE,
         ])
         ->orderBy('created_at', 'desc')
         ->get();
@@ -287,7 +288,8 @@ class DepotController extends Controller
         $depot = Depot::with([
             'prestations',
             'sorties',
-            'transferts'
+            'transferts',
+            ...Depot::TRACE,
         ])->find($id);
 
         if (!$depot) {
@@ -453,7 +455,7 @@ class DepotController extends Controller
 
             'contact_telephone' => $data['contact_telephone'],
 
-            'contact_cni' => $data['contact_cni'],
+            'contact_cni' => $data['contact_cni'] ?? null,
 
             'lien_parente' => $data['lien_parente'] ?? null,
 
@@ -525,7 +527,7 @@ class DepotController extends Controller
      * GET /api/depots-disponibles
      * ============================================================
      */
-    public function depotsDisponibles()
+    public function corpsDisponibles()
     {
         try {
 
