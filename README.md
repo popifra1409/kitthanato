@@ -14,8 +14,24 @@ npm install
 cp .env.example .env        # puis renseigner DB_* (PostgreSQL)
 php artisan key:generate
 php artisan migrate         # crée aussi les rôles/permissions et convertit les anciens rôles
-php artisan db:seed         # (installation neuve) compte « Administrateur » / Admin@1234
+php artisan db:seed         # permissions + super administrateur
 ```
+
+### Super administrateur
+
+```bash
+php artisan db:seed --class=SuperAdminSeeder
+```
+
+- Identifiant : `superadmin` — mot de passe : `SuperAdmin@2026` (en local).
+  Personnalisable dans `.env` : `SUPER_ADMIN_NAME`, `SUPER_ADMIN_PASSWORD`.
+- En production sans `SUPER_ADMIN_PASSWORD`, un mot de passe aléatoire est généré
+  et affiché **une seule fois** dans la console.
+- Rôle ADMIN avec **toutes** les permissions (y compris celles ajoutées plus tard).
+- Peut être relancé sans risque : si le compte a été supprimé, désactivé ou a perdu son
+  rôle, il est restauré, réactivé et remis en ADMIN. Le mot de passe n'est changé que si
+  `SUPER_ADMIN_PASSWORD` est renseigné.
+- Chaque exécution est inscrite dans l'historique (`SEED_SUPER_ADMIN` / `REPARATION_SUPER_ADMIN`).
 
 ### Développement
 
@@ -23,7 +39,15 @@ php artisan db:seed         # (installation neuve) compte « Administrateur » /
 composer run dev            # php artisan serve + queue + logs + vite (HMR React)
 ```
 
-Ouvrir http://127.0.0.1:8000 — plus besoin de lancer un front séparé ni de configurer CORS.
+Ouvrir **http://localhost:8000** (l'adresse affichée par `php artisan serve`).
+
+> ⚠️ **Ne pas ouvrir http://localhost:5173.** Ce port est le serveur Vite : il ne fait que
+> fournir le JavaScript/CSS à Laravel et affiche seulement une page « Laravel Vite ».
+> L'application (et la page de connexion) est toujours servie par Laravel.
+>
+> En local, mettez `APP_URL=http://localhost:8000` dans `.env` (la page Vite et les liens
+> générés utilisent cette adresse). Pour un autre port : `php artisan serve --port=8080`
+> **et** `npm run dev` en parallèle, puis http://localhost:8080.
 
 ### Production
 

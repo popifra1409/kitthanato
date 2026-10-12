@@ -41,7 +41,7 @@ export const auth = {
     login: (name, password) =>
         post("/login", { name, password }, { skipAuthRedirect: true }),
     logout: () => post("/logout", null, { skipAuthRedirect: true }),
-    me: () => get("/me"),
+    me: (config) => get("/me", undefined, config),
     changePassword: (donnees) => put("/me/password", donnees),
 };
 
