@@ -1,3 +1,4 @@
+
 import "./Navbar.css";
 import { useEffect, useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
@@ -6,6 +7,7 @@ import { useSession } from "../services/SessionContext";
 function Navbar() {
     const [showAdminMenu, setShowAdminMenu] = useState(false);
     const [showParametresMenu, setShowParametresMenu] = useState(false);
+    const [showDocumentsMenu, setShowDocumentsMenu] = useState(false);
 
     const [darkMode, setDarkMode] = useState(() => {
         return localStorage.getItem("darkMode") === "true";
@@ -22,8 +24,13 @@ function Navbar() {
             if (!e.target.closest(".navbar-user")) {
                 setShowAdminMenu(false);
             }
+
             if (!e.target.closest(".navbar-parametres-wrapper")) {
                 setShowParametresMenu(false);
+            }
+
+            if (!e.target.closest(".navbar-documents-wrapper")) {
+                setShowDocumentsMenu(false);
             }
         };
 
@@ -32,9 +39,11 @@ function Navbar() {
         return () => document.removeEventListener("click", handler);
     }, []);
 
-    /* ---------- FERMER LE MENU PARAMÈTRES AU CHANGEMENT DE PAGE ---------- */
+    /* ---------- FERMER LES MENUS AU CHANGEMENT DE PAGE ---------- */
     useEffect(() => {
         setShowParametresMenu(false);
+        setShowDocumentsMenu(false);
+        setShowAdminMenu(false);
     }, [location.pathname]);
 
     /* ---------- FERMER AVEC ÉCHAP ---------- */
@@ -42,6 +51,7 @@ function Navbar() {
         const gererEchap = (e) => {
             if (e.key === "Escape") {
                 setShowParametresMenu(false);
+                setShowDocumentsMenu(false);
                 setShowAdminMenu(false);
             }
         };
@@ -55,7 +65,10 @@ function Navbar() {
     const toggleDarkMode = () => {
         setDarkMode((prev) => {
             const nouveauMode = !prev;
+
             document.body.classList.toggle("dark-mode", nouveauMode);
+            localStorage.setItem("darkMode", String(nouveauMode));
+
             return nouveauMode;
         });
     };
@@ -82,8 +95,13 @@ function Navbar() {
     const canUtilisateurs = can("utilisateurs.view");
     const canRoles = can("roles.view");
     const canCorbeille = can("corbeille.view");
+
     const canParametres =
-        canHistorique || canReferentiels || canUtilisateurs || canRoles || canCorbeille;
+        canHistorique ||
+        canReferentiels ||
+        canUtilisateurs ||
+        canRoles ||
+        canCorbeille;
 
     return (
         <nav className="navbar">
@@ -95,7 +113,7 @@ function Navbar() {
                 </div>
             </div>
 
-            {/* MENU */}
+            {/* MENU PRINCIPAL */}
             <div className="navbar-links">
 
                 {canDashboard && (
@@ -104,36 +122,95 @@ function Navbar() {
                     </NavLink>
                 )}
 
-                {canDeclarations && (
-                    <NavLink to="/declarations" className="nav-link">
-                        <span>Déclaration</span>
-                    </NavLink>
-                )}
-
+                {/* DÉPÔT */}
                 {canDepot && (
                     <NavLink to="/DepotCorps" className="nav-link">
                         <span>Dépôt</span>
                     </NavLink>
                 )}
 
+                {/* TRANSFERT */}
                 {canTransfert && (
                     <NavLink to="/transfert" className="nav-link">
                         <span>Transfert</span>
                     </NavLink>
                 )}
 
+                {/* SORTIE */}
                 {canSortie && (
                     <NavLink to="/Sortie" className="nav-link">
                         <span>Sortie</span>
                     </NavLink>
                 )}
 
+                {/* LEVÉE */}
                 {canLevees && (
                     <NavLink to="/PlanningLevees" className="nav-link">
                         <span>Levée</span>
                     </NavLink>
                 )}
 
+{/* MENU DOCUMENTS */}
+                {canDeclarations && (
+                    <div className="nav-link">
+
+                        <button
+                            type="button"
+                            className={`nav-link navbar-documents-btn ${
+                                showDocumentsMenu ? "active" : ""
+                            }`}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDocumentsMenu((prev) => !prev);
+                                setShowParametresMenu(false);
+                            }}
+                            aria-expanded={showDocumentsMenu}
+                            aria-haspopup="true"
+                        >
+                            <span>Documents</span>
+
+                            <span className="documents-arrow">
+                                {showDocumentsMenu ? "▲" : "▼"}
+                            </span>
+                        </button>
+
+                        {showDocumentsMenu && (
+                            <div className="documents-dropdown">
+
+                                <div className="documents-dropdown-header">
+                                    Documents 
+                                </div>
+
+                                <NavLink
+                                    to="/declarations"
+                                    className="documents-item"
+                                    onClick={() =>
+                                        setShowDocumentsMenu(false)
+                                    }
+                                >
+                                    <span className="documents-item-icon">
+                                        📄
+                                    </span>
+
+                                    <span>Déclaration de décès</span>
+                                </NavLink>
+
+                                <NavLink
+                                to="/certificatgenremort"
+                                className="documents-item"
+                                onClick={() => setShowDocumentsMenu(false)}
+>
+    <span className="documents-item-icon">📝</span>
+    <span>Certificat de genre de mort</span>
+</NavLink>
+
+                            </div>
+                        )}
+                    </div>
+                )}
+
+
+                {/* STATISTIQUES */}
                 {canStatistiques && (
                     <NavLink to="/Statistiques" className="nav-link">
                         <span>Statistiques</span>
@@ -145,11 +222,10 @@ function Navbar() {
             {/* PARTIE DROITE */}
             <div className="navbar-right">
 
-                {/* =====================================================
-                    MENU PARAMÈTRES AVEC SOUS-MENU
-                ===================================================== */}
+                {/* MENU PARAMÈTRES */}
                 {canParametres && (
                     <div className="navbar-parametres-wrapper">
+
                         <button
                             type="button"
                             className={`navbar-parametres-btn ${
@@ -157,15 +233,18 @@ function Navbar() {
                             }`}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                setShowParametresMenu(!showParametresMenu);
+                                setShowParametresMenu((prev) => !prev);
+                                setShowDocumentsMenu(false);
                             }}
                             title="Paramètres"
+                            aria-expanded={showParametresMenu}
                         >
                             <span className="parametre-icon">⚙️</span>
                         </button>
 
                         {showParametresMenu && (
                             <div className="parametres-dropdown">
+
                                 <div className="parametres-dropdown-header">
                                     Paramètres
                                 </div>
@@ -260,46 +339,65 @@ function Navbar() {
                                         </div>
                                     </NavLink>
                                 )}
+
                             </div>
                         )}
                     </div>
                 )}
 
-                <NavLink
+                {/* NOTIFICATIONS */}
+              { /* <NavLink
                     to="/notifications"
                     className="notification-button"
                     title="Notifications"
                 >
                     <span className="notification-icon">🔔</span>
-                </NavLink>
+                </NavLink>*/}
 
                 <div className="navbar-separator"></div>
 
+                {/* UTILISATEUR */}
                 <div className="navbar-user">
 
                     <div className="user-info">
                         <strong>{user?.name || "Utilisateur"}</strong>
-                        {user?.role_libelle && <small>{user.role_libelle}</small>}
+
+                        {user?.role_libelle && (
+                            <small>{user.role_libelle}</small>
+                        )}
                     </div>
 
                     <button
                         type="button"
                         className="user-arrow"
-                        onClick={() => setShowAdminMenu(!showAdminMenu)}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowAdminMenu((prev) => !prev);
+                        }}
+                        aria-expanded={showAdminMenu}
                     >
                         {showAdminMenu ? "▲" : "▼"}
                     </button>
 
                     {showAdminMenu && (
                         <div className="admin-dropdown">
-                            <button type="button" onClick={toggleDarkMode}>
+
+                            <button
+                                type="button"
+                                onClick={toggleDarkMode}
+                            >
                                 {darkMode
                                     ? "☀️ Luminosité claire"
                                     : "🌙 Mode sombre"}
                             </button>
-                            <button type="button" onClick={handleLogout}>
+
+                            <button
+                                type="button"
+                                onClick={handleLogout}
+                            >
                                 🔒 Déconnexion
                             </button>
+
                         </div>
                     )}
 

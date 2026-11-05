@@ -68,20 +68,38 @@
 ========================================================= */
 
 .recu-header {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 120px 1fr;
-    align-items: start;
-    border-bottom: 2px solid #111;
-    padding-bottom: 12px;
+        display: grid;
+    grid-template-columns: 1fr auto;    
+    align-items: center;
+    
 }
 
 
 /* HÔPITAL : EXTRÊME GAUCHE */
 
 .recu-header-left {
+    display: flex;
+    gap: 8px;              
+    align-items: center;
+}
+.francais {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     text-align: left;
-    justify-self: start;
+}
+.francais h1 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.francais h2 {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
 }
 
 .recu-header-left h1 {
@@ -94,6 +112,7 @@
     margin: 5px 0;
     font-size: 12px;
     font-weight: 700;
+    text-align: center;
 }
 
 .recu-header-left p {
@@ -107,21 +126,47 @@
 .recu-header-center {
     display: flex;
     justify-content: center;
-    align-items: flex-start;
+    align-items: center;
+    flex-shrink: 0;
 }
 
 .logo-circle {
-    width: 70px;
-    height: 70px;
-    border: 2px solid #222;
-    border-radius: 50%;
+    width: 110px;
+    height: 110px;
 
     display: flex;
     justify-content: center;
     align-items: center;
+overflow: visible; 
+}
 
+.logo-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 3px;
+}
+/* -------- ANGLAIS -------- */
+.anglais {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: left;
+}
+
+.anglais h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.anglais h2 {
+    margin: 0;
     font-size: 11px;
-    font-weight: bold;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
 }
 
 
@@ -174,6 +219,7 @@
     flex-direction: column;
     text-align: left;
     font-size: 15px;
+    margin-left: 50px;
 }
 
 .reference-center span {
@@ -184,9 +230,10 @@
 .reference-right {
     display: flex;
     flex-direction: column;
-    text-align: right;
+    text-align: left;
     font-size: 11px;
     font-style: italic;
+    margin-left:80px;
 }
 
 .reference-right span {
@@ -202,6 +249,7 @@
 .recu-informations {
     margin-top: 18px;
     font-size: 12px;
+    
 }
 
 .recu-soussigne {
@@ -222,6 +270,16 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+    font-size: 16px;         
+    font-weight: 800;
+}
+.ligne-information1 {
+    gap: 350px;              
+    align-items: center;
+    display: flex; 
+    font-weight: bold;
+    font-size: 16px;         
+    font-weight: 800;
 }
 
 .ligne-consultation {
@@ -230,6 +288,8 @@
     align-items: flex-start;
     margin-top: 15px;
     gap: 20px;
+    font-size: 15px;         
+    font-weight: 750;
 }
 
 .ligne-consultation > div {
@@ -250,7 +310,7 @@
 .recu-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 11px;
+    font-size: 14px;
 }
 
 .recu-table th,
@@ -265,17 +325,11 @@
     font-weight: 800;
 }
 
-.col-num {
-    width: 35px;
-}
 
 .col-designation {
-    width: auto;
+    width: 150px;
 }
 
-.col-qte {
-    width: 45px;
-}
 
 .col-prix {
     width: 95px;
@@ -289,8 +343,9 @@
     text-align: center;
 }
 
-.text-right {
-    text-align: right;
+.text-right1 {
+    border: 1.5px solid #222;    
+    border-collapse: collapse;
 }
 
 .empty-row {
@@ -320,6 +375,7 @@
     margin-left: 0;
     margin-right: auto;
     text-align: left;
+    margin-top: 60px;
 }
 
 
@@ -330,6 +386,7 @@
     margin-left: auto;
     margin-right: 0;
     text-align: right;
+    transform: translateY(-130px);
 }
 }
 
@@ -351,20 +408,20 @@
 }
 
 .total-box-title {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
     line-height: 1.5;
 }
 
 .total-box-subtitle {
-    font-size: 9px;
+    font-size: 12px;
     font-style: italic;
     margin-top: 3px;
 }
 
 .montant-lettres {
     margin-top: 20px;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 700;
 }
 
@@ -389,20 +446,23 @@
 ========================================================= */
 
 .signature-cachet {
-    margin-top: 30px;
-    text-align: center;
+        margin-top: 30px;
+    text-align: right;
+    padding-right: 40px;
+    
 }
 
 .signature-cachet p {
     margin: 0;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
+    
+    transform: translateY(-100px); 
 }
 
 .signature-espace {
     height: 45px;
     margin-top: 8px;
-    border-bottom: 1px solid #222;
 }
 
 
@@ -465,10 +525,13 @@
     }
 
     .recu-header-left{
-        text-align: left;
     }
     .recu-header-right {
-        text-align: right;
+           text-align: right;
+    justify-self: end;
+    margin-left: auto;          
+    max-width: 240px;
+    padding-left: 20px;
     }
 
     .recu-header-center {
@@ -545,4 +608,7 @@
         padding: 12mm;
         box-shadow: none;
     }
+}
+@media print {
+  .no-print { display: none ; }
 }

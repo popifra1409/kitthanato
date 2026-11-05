@@ -660,3 +660,25 @@
         padding: 16px;
     }
 }
+.stat-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.stat-actions button {
+    border: 1px solid #d9cbe5;
+    background: white;
+    color: #6d359d;
+    border-radius: 7px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.stat-actions button:hover {
+    background: #f4eef9;
+    border-color: #bfa6d1;
+}

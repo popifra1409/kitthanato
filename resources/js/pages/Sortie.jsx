@@ -10,7 +10,6 @@ import { hasPermission } from "../services/session";
    OUTILS
 ========================================================= */
 
-
 const getToday = () => {
     const date = new Date();
     const year = date.getFullYear();
@@ -80,6 +79,7 @@ const calculerNombreNuits = (dateArrivee, dateSortie) => {
     return Math.max(0, Math.floor(difference));
 };
 
+
 /* =========================================================
    TARIF CONSERVATION
 ========================================================= */
@@ -96,6 +96,101 @@ const getTarifConservation = (emplacement) => {
     }
 
     return 10000;
+};
+
+/* =========================================================
+   OUTILS CHAPELLE / CRÉNEAUX
+========================================================= */
+
+const DUREES_LEVEE = [
+    { value: 10, label: "10 minutes" },
+    { value: 15, label: "15 minutes" },
+    { value: 30, label: "30 minutes" },
+    { value: 45, label: "45 minutes" },
+    { value: 60, label: "1 heure" },
+    { value: 90, label: "1 h 30" },
+    { value: 120, label: "2 heures" },
+    { value: 180, label: "3 heures" },
+    { value: 240, label: "4 heures" },
+];
+
+/* Construit un Date complet depuis "YYYY-MM-DD" + "HH:mm" */
+const construireDateHeure = (date, heure) => {
+    if (!date || !heure) return null;
+    const iso = `${String(date).substring(0, 10)}T${String(heure).substring(
+        0,
+        5
+    )}:00`;
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? null : d;
+};
+
+/* Retourne { debut, fin } d'une sortie selon sa durée */
+const intervalleSortie = (sortie) => {
+    const debut = construireDateHeure(sortie.date, sortie.heure);
+    if (!debut) return null;
+
+    const minutes = nombre(sortie.duree_levee) || 60;
+    const fin = new Date(debut.getTime() + minutes * 60 * 1000);
+    return { debut, fin };
+};
+
+/* Deux intervalles se chevauchent-ils ? */
+const seChevauchent = (a, b) => {
+    if (!a || !b) return false;
+    return a.debut < b.fin && b.debut < a.fin;
+};
+
+/* Formatage "HH:mm" d'un Date */
+const formatHeure = (date) => {
+    if (!date) return "—";
+    return `${String(date.getHours()).padStart(2, "0")}:${String(
+        date.getMinutes()
+    ).padStart(2, "0")}`;
+};
+
+/* =========================================================
+   OUTILS RETARD
+========================================================= */
+
+/* Une sortie est "en retard" si :
+   - statut = EN COURS
+   - date + heure déjà passées (par rapport à `now`)
+*/
+const estEnRetard = (sortie, now = Date.now()) => {
+    if (!sortie) return false;
+
+    const statut = normaliserStatut(sortie.statut);
+    if (statut !== "EN COURS") return false;
+
+    const debut = construireDateHeure(sortie.date, sortie.heure);
+    if (!debut) return false;
+
+    return debut.getTime() < now;
+};
+
+/* Retard formaté en jours / heures / minutes, basé sur `now` */
+const formatRetard = (sortie, now = Date.now()) => {
+    if (!sortie) return "—";
+
+    const debut = construireDateHeure(sortie.date, sortie.heure);
+    if (!debut) return "—";
+
+    const diffMs = now - debut.getTime();
+    if (diffMs <= 0) return "—";
+
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    const heures = Math.floor(minutes / 60);
+    const jours = Math.floor(heures / 24);
+
+    if (jours >= 1) return jours === 1 ? "1 jour" : `${jours} jours`;
+    if (heures >= 1) return heures === 1 ? "1 heure" : `${heures} heures`;
+    return minutes === 1 ? "1 minute" : `${minutes} minutes`;
+};
+
+const valideStatut = (sortie) => {
+    const s = normaliserStatut(sortie?.statut);
+    return s === "VALIDE" || s === "VALIDEE" || s === "TERMINE";
 };
 
 /* =========================================================
@@ -129,6 +224,9 @@ export default function Sortie() {
     /* ---------- Menu actions ---------- */
     const [openMenuId, setOpenMenuId] = useState(null);
 
+    /* ---------- Tick pour rafraîchir le calcul du retard ---------- */
+    const [tick, setTick] = useState(0);
+
     const [form, setForm] = useState({
         id: null,
         depot_id: "",
@@ -136,6 +234,7 @@ export default function Sortie() {
         heure: getCurrentTime(),
         recuperateur: "",
         chapelle_id: "",
+        duree_levee: 60,
         prestations: [],
     });
 
@@ -175,6 +274,32 @@ export default function Sortie() {
             document.removeEventListener("click", fermerMenu);
             document.removeEventListener("keydown", gererEchap);
         };
+    }, []);
+
+    useEffect(() => {
+        const fermer = (e) => {
+            if (e.type === "keydown") {
+                if (e.key === "Escape") setAfficherSuggestions(false);
+                return;
+            }
+            if (!e.target.closest(".defunt-search-wrapper")) {
+                setAfficherSuggestions(false);
+            }
+        };
+
+        document.addEventListener("mousedown", fermer);
+        document.addEventListener("keydown", fermer);
+
+        return () => {
+            document.removeEventListener("mousedown", fermer);
+            document.removeEventListener("keydown", fermer);
+        };
+    }, []);
+
+    /* ✅ Tick toutes les 60 s pour rafraîchir le calcul du retard */
+    useEffect(() => {
+        const timer = setInterval(() => setTick((n) => n + 1), 60 * 1000);
+        return () => clearInterval(timer);
     }, []);
 
     /* =====================================================
@@ -230,8 +355,7 @@ export default function Sortie() {
             showNotif(
                 "error",
                 "Erreur",
-                error.message ||
-                    "Impossible de charger les sorties."
+                error.message || "Impossible de charger les sorties."
             );
         }
     };
@@ -289,6 +413,9 @@ export default function Sortie() {
                 statut === "ENCORE_PRESENT";
 
             if (!present) return false;
+
+            // Un corps scellé ne peut pas sortir
+            if (depot.scelle) return false;
 
             if (Number(form.depot_id) === Number(depot.id)) return true;
 
@@ -396,6 +523,60 @@ export default function Sortie() {
     }, [montantConservation, montantChapelle, montantPrestations]);
 
     /* =====================================================
+       VÉRIFICATION DISPONIBILITÉ CHAPELLE
+    ===================================================== */
+
+    const intervalleDemande = useMemo(() => {
+        const debut = construireDateHeure(form.date, form.heure);
+        if (!debut) return null;
+        const minutes = nombre(form.duree_levee) || 60;
+        const fin = new Date(debut.getTime() + minutes * 60 * 1000);
+        return { debut, fin };
+    }, [form.date, form.heure, form.duree_levee]);
+
+    const sortiesMemeChapelle = useMemo(() => {
+        if (!form.chapelle_id) return [];
+
+        return sorties.filter((s) => {
+            const chapelleId = s.chapelle_id ?? s.chapelle?.id;
+            if (Number(chapelleId) !== Number(form.chapelle_id)) return false;
+            if (form.id && Number(s.id) === Number(form.id)) return false;
+
+            const statut = normaliserStatut(s.statut);
+            if (statut === "ANNULE" || statut === "ANNULEE") return false;
+
+            return true;
+        });
+    }, [sorties, form.chapelle_id, form.id]);
+
+    const conflitChapelle = useMemo(() => {
+        if (!intervalleDemande) return null;
+
+        for (const s of sortiesMemeChapelle) {
+            const inter = intervalleSortie(s);
+            if (seChevauchent(intervalleDemande, inter)) {
+                return { sortie: s, intervalle: inter };
+            }
+        }
+        return null;
+    }, [intervalleDemande, sortiesMemeChapelle]);
+
+    /* =====================================================
+       SORTIES EN RETARD
+    ===================================================== */
+
+    const sortiesEnRetard = useMemo(() => {
+    const now = Date.now();
+    return sorties.filter((s) => estEnRetard(s, now));
+}, [sorties, tick]);
+
+    const idsEnRetard = useMemo(() => {
+        return new Set(sortiesEnRetard.map((s) => s.id));
+    }, [sortiesEnRetard]);
+
+    const nombreEnRetard = sortiesEnRetard.length;
+
+    /* =====================================================
        FILTRE LISTE SORTIES
     ===================================================== */
 
@@ -473,6 +654,7 @@ export default function Sortie() {
                 recuperateur: "",
                 date: getToday(),
                 chapelle_id: "",
+                duree_levee: 60,
                 prestations: [],
             }));
         }
@@ -490,6 +672,7 @@ export default function Sortie() {
             heure: getCurrentTime(),
             recuperateur: "",
             chapelle_id: "",
+            duree_levee: 60,
             prestations: [],
         });
 
@@ -533,6 +716,7 @@ export default function Sortie() {
                 : getCurrentTime(),
             recuperateur: sortie.recuperateur || "",
             chapelle_id: sortie.chapelle_id || sortie.chapelle?.id || "",
+            duree_levee: nombre(sortie.duree_levee) || 60,
             prestations: prestationsExistantes,
         });
 
@@ -584,17 +768,29 @@ export default function Sortie() {
         event.preventDefault();
 
         if (!form.depot_id) {
-            showNotif("error", "Champ manquant", "Veuillez sélectionner un défunt.");
+            showNotif(
+                "error",
+                "Champ manquant",
+                "Veuillez sélectionner un défunt."
+            );
             return;
         }
 
         if (!form.date) {
-            showNotif("error", "Champ manquant", "Veuillez sélectionner une date.");
+            showNotif(
+                "error",
+                "Champ manquant",
+                "Veuillez sélectionner une date."
+            );
             return;
         }
 
         if (!form.heure) {
-            showNotif("error", "Champ manquant", "Veuillez sélectionner une heure.");
+            showNotif(
+                "error",
+                "Champ manquant",
+                "Veuillez sélectionner une heure."
+            );
             return;
         }
 
@@ -612,6 +808,22 @@ export default function Sortie() {
                 "error",
                 "Date invalide",
                 "La date de sortie ne peut pas être antérieure à aujourd'hui."
+            );
+            return;
+        }
+
+        /* ✅ Vérification disponibilité chapelle (front) */
+        if (form.chapelle_id && conflitChapelle) {
+            showNotif(
+                "error",
+                "Chapelle indisponible",
+                `La chapelle est déjà réservée de ${formatHeure(
+                    conflitChapelle.intervalle.debut
+                )} à ${formatHeure(
+                    conflitChapelle.intervalle.fin
+                )} (sortie de ${nomDefunt(
+                    conflitChapelle.sortie.depot
+                )}).`
             );
             return;
         }
@@ -635,6 +847,7 @@ export default function Sortie() {
             recuperateur: form.recuperateur.trim(),
             chapelle_id: chapellePayload ? chapellePayload.id : null,
             chapelle: chapellePayload,
+            duree_levee: Number(form.duree_levee) || 60,
             prestations: prestationsPayload,
             montant_prestations: montantPrestations,
             montant_nuits: montantConservation,
@@ -646,11 +859,19 @@ export default function Sortie() {
             if (form.id) {
                 await api.sorties.update(form.id, donnees);
 
-                showNotif("success", "Sortie modifiée", "Les modifications ont été enregistrées.");
+                showNotif(
+                    "success",
+                    "Sortie modifiée",
+                    "Les modifications ont été enregistrées."
+                );
             } else {
                 await api.sorties.create(donnees);
 
-                showNotif("success", "Sortie enregistrée", "La sortie a été enregistrée avec succès.");
+                showNotif(
+                    "success",
+                    "Sortie enregistrée",
+                    "La sortie a été enregistrée avec succès."
+                );
             }
 
             setShowFormulaire(false);
@@ -665,8 +886,9 @@ export default function Sortie() {
                 erreurs?.depot_id?.[0] ||
                 erreurs?.date?.[0] ||
                 erreurs?.heure?.[0] ||
-                erreurs?.prestations?.[0] ||
                 erreurs?.chapelle_id?.[0] ||
+                erreurs?.duree_levee?.[0] ||
+                erreurs?.prestations?.[0] ||
                 "Impossible d'enregistrer la sortie.";
 
             showNotif("error", "Échec", messageErreur);
@@ -685,7 +907,11 @@ export default function Sortie() {
             statut === "VALIDEE" ||
             statut === "TERMINE"
         ) {
-            showNotif("error", "Action impossible", "Cette sortie est déjà validée.");
+            showNotif(
+                "error",
+                "Action impossible",
+                "Cette sortie est déjà validée."
+            );
             return;
         }
 
@@ -721,7 +947,9 @@ export default function Sortie() {
             showNotif(
                 "error",
                 "Montant trop élevé",
-                `Le montant ne peut pas dépasser ${formatMontant(reste)} FCFA.`
+                `Le montant ne peut pas dépasser ${formatMontant(
+                    reste
+                )} FCFA.`
             );
             return;
         }
@@ -733,7 +961,11 @@ export default function Sortie() {
             setSortiePaiement(null);
             setMontantPaiement("");
 
-            showNotif("success", "Paiement enregistré", "Le paiement a été enregistré avec succès.");
+            showNotif(
+                "success",
+                "Paiement enregistré",
+                "Le paiement a été enregistré avec succès."
+            );
 
             await chargerDonnees();
         } catch (error) {
@@ -746,6 +978,61 @@ export default function Sortie() {
                     "Impossible d'enregistrer le paiement."
             );
         }
+    };
+
+    /* =====================================================
+       IMPRIMER LE REÇU
+    ===================================================== */
+
+    const ouvrirRecu = (sortie) => {
+        const prestationsRecu = Array.isArray(sortie.prestations)
+            ? sortie.prestations.map((p) => ({
+                  designation: p.nom || p.designation || "Prestation",
+                  quantite: Number(p.quantite || 1),
+                  prixUnitaire: Number(p.prix || p.prixUnitaire || 0),
+              }))
+            : [];
+
+        if (Number(sortie.montant_nuits) > 0) {
+            prestationsRecu.unshift({
+                designation: `Conservation (${sortie.jours || 0} jour(s))`,
+                quantite: 1,
+                prixUnitaire: Number(sortie.montant_nuits || 0),
+            });
+        }
+
+        if (Number(sortie.montant_chapelle) > 0) {
+            prestationsRecu.push({
+                designation: sortie.chapelle_nom
+                    ? `Chapelle : ${sortie.chapelle_nom}`
+                    : "Chapelle",
+                quantite: 1,
+                prixUnitaire: Number(sortie.montant_chapelle || 0),
+            });
+        }
+
+        const donneesRecu = {
+            numero: sortie.code || `REC-${sortie.id}`,
+            date: sortie.date,
+            heure: sortie.heure,
+
+            etablissement: "HÔPITAL GÉNÉRAL",
+            service: "SERVICE DE THANATOPRAXIE",
+
+            nomDefunt: nomDefunt(sortie.depot),
+            codeDefunt: codeDefunt(sortie.depot),
+
+            payeur: sortie.depot?.contact_nom || sortie.recuperateur || "",
+            telephonePayeur: sortie.depot?.contact_telephone || "",
+            lienParente: sortie.depot?.lien_parente || "",
+
+            prestations: prestationsRecu,
+
+            montantPaye: Number(sortie.montant_paye || 0),
+        };
+
+        localStorage.setItem("recu_actuel", JSON.stringify(donneesRecu));
+        window.open("/recu", "_blank");
     };
 
     /* =====================================================
@@ -788,8 +1075,7 @@ export default function Sortie() {
                     showNotif(
                         "error",
                         "Échec",
-                        error.message ||
-                            "Impossible de supprimer cette sortie."
+                        error.message || "Impossible de supprimer cette sortie."
                     );
 
                     throw error;
@@ -828,6 +1114,113 @@ export default function Sortie() {
                     </button>
                 )}
             </div>
+
+            {/* ✅ ALERTE : sorties en retard */}
+            {nombreEnRetard > 0 && (
+                <div className="alert-banner alert-banner-danger">
+                    <div className="alert-banner-icon">⚠</div>
+
+                    <div className="alert-banner-body">
+                        <strong>
+                            {nombreEnRetard} sortie
+                            {nombreEnRetard > 1 ? "s" : ""} en retard
+                        </strong>
+                        <span>
+                            La date de sortie est déjà passée mais le statut
+                            est encore « EN COURS ». Corrigez la date/heure
+                            ou enregistrez le paiement pour finaliser la
+                            sortie.
+                        </span>
+                    </div>
+
+                    <button
+                        type="button"
+                        className="alert-banner-action"
+                        onClick={() => {
+                            setFiltreStatut("EN COURS");
+                            setRecherche("");
+                        }}
+                    >
+                        Voir les sorties en retard
+                    </button>
+                </div>
+            )}
+
+            {/* ✅ DÉTAIL DES SORTIES EN RETARD */}
+            {nombreEnRetard > 0 && (
+                <div className="alert-detail">
+                    <div className="alert-detail-title">
+                        Détail des sorties en retard
+                    </div>
+
+                    <ul className="alert-detail-list">
+                        {sortiesEnRetard.map((sortie) => (
+                            <li
+                                key={sortie.id}
+                                className="alert-detail-item"
+                            >
+                                <div className="alert-detail-info">
+                                    <strong>
+                                        {nomDefunt(sortie.depot)}
+                                    </strong>
+                                    <span>
+                                        Code : {codeDefunt(sortie.depot)}{" "}
+                                        —{" "}
+                                        {String(sortie.date).substring(0, 10)}{" "}
+                                        à{" "}
+                                        {String(sortie.heure).substring(
+                                            0,
+                                            5
+                                        )}
+                                    </span>
+                                    <span className="alert-detail-retard">
+                                        Retard : {formatRetard(sortie)}
+                                    </span>
+                                </div>
+
+                                <div className="alert-detail-actions">
+                                    {hasPermission("sorties.update") && (
+                                        <button
+                                            type="button"
+                                            className="btn-warning-small"
+                                            onClick={() =>
+                                                modifierSortie(sortie)
+                                            }
+                                        >
+                                            ✎ Corriger
+                                        </button>
+                                    )}
+
+                                    {!valideStatut(sortie) &&
+                                        hasPermission("sorties.payer") && (
+                                            <button
+                                                type="button"
+                                                className="btn-primary-small"
+                                                onClick={() =>
+                                                    ouvrirPaiement(sortie)
+                                                }
+                                            >
+                                                💳 Payer & clôturer
+                                            </button>
+                                        )}
+
+                                    {hasPermission("sorties.delete") && (
+                                        <button
+                                            type="button"
+                                            className="btn-secondary-small"
+                                            onClick={() =>
+                                                demanderSuppression(sortie)
+                                            }
+                                        >
+                                            🗑 Supprimer
+                                        </button>
+                                    )}
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
 
             {/* TOOLBAR */}
             <div className="sortie-toolbar">
@@ -903,7 +1296,7 @@ export default function Sortie() {
                                     <th>Récupérateur</th>
                                     <th>Prix total</th>
                                     <th>Payé</th>
-                                    <th>Quart-tier</th>
+                                    <th>Réduction</th>
                                     <th>Statut</th>
                                     <th>Actions</th>
                                 </tr>
@@ -915,7 +1308,6 @@ export default function Sortie() {
                                     const paye = nombre(sortie.montant_paye);
                                     const reste = Math.max(total - paye, 0);
 
-                                    /* % RESTE À PAYER */
                                     const pourcentageReste =
                                         total > 0
                                             ? Math.min(
@@ -935,14 +1327,37 @@ export default function Sortie() {
                                         statut === "VALIDEE" ||
                                         statut === "TERMINE";
 
+                                    const enRetard = idsEnRetard.has(
+                                        sortie.id
+                                    );
+
+                                    const scelle = sortie.depot?.scelle === true;
+
+
                                     return (
-                                        <tr key={sortie.id}>
+                                        <tr
+                                            key={sortie.id}
+                                            className={
+                                                enRetard ? "row-late" : ""
+                                            }
+                                        >
                                             <td>
                                                 {sortie.date
                                                     ? String(
                                                           sortie.date
                                                       ).substring(0, 10)
                                                     : "-"}
+
+                                                {enRetard && (
+                                                    <span
+                                                        className="late-badge"
+                                                        title={`En retard de ${formatRetard(
+                                                            sortie
+                                                        )}`}
+                                                    >
+                                                        ⚠
+                                                    </span>
+                                                )}
                                             </td>
 
                                             <td>
@@ -955,8 +1370,9 @@ export default function Sortie() {
 
                                             <td>
                                                 <span className="code-badge">
-                                                    {codeDefunt(sortie.depot)}
-                                                </span>
+    {codeDefunt(sortie.depot)}
+    {scelle && <span title="Corps scellé"> 🔒</span>}
+</span>
                                             </td>
 
                                             <td>
@@ -969,12 +1385,14 @@ export default function Sortie() {
                                                 <strong>
                                                     {sortie.depot
                                                         ?.contact_nom || "-"}
-                                                </strong> <br />
+                                                </strong>{" "}
+                                                <br />
                                                 <span>
                                                     {sortie.depot
                                                         ?.contact_telephone ||
                                                         ""}
-                                                </span> <br />
+                                                </span>{" "}
+                                                <br />
                                                 <span>
                                                     CNI :{" "}
                                                     {sortie.depot
@@ -990,15 +1408,14 @@ export default function Sortie() {
                                                 {formatMontant(paye)} FCFA
                                             </td>
 
-                                            {/* ============ RESTE À PAYER ============ */}
                                             <td className="amount remaining">
                                                 <div className="reste-info">
                                                     <strong>
                                                         {formatMontant(reste)}{" "}
-                                                        FCFA 
-                                                    </strong> <br />
-                                                    
-                                                    <span >
+                                                        FCFA
+                                                    </strong>{" "}
+                                                    <br />
+                                                    <span>
                                                         {pourcentageReste}%
                                                     </span>
                                                 </div>
@@ -1018,7 +1435,6 @@ export default function Sortie() {
                                                 </span>
                                             </td>
 
-                                            {/* ============ MENU ACTIONS ============ */}
                                             <td className="actions-cell">
                                                 <div className="actions-menu-container">
                                                     <button
@@ -1046,7 +1462,9 @@ export default function Sortie() {
                                                                 e.stopPropagation()
                                                             }
                                                         >
-                                                            {hasPermission("sorties.update") && (
+                                                            {!scelle && hasPermission(
+                                                                "sorties.update"
+                                                            ) && (
                                                                 <button
                                                                     type="button"
                                                                     className="actions-menu-item edit"
@@ -1063,24 +1481,46 @@ export default function Sortie() {
                                                                 </button>
                                                             )}
 
-                                                            {!valide && hasPermission("sorties.payer") && (
-                                                                <button
-                                                                    type="button"
-                                                                    className="actions-menu-item payment"
-                                                                    onClick={() => {
-                                                                        ouvrirPaiement(
-                                                                            sortie
-                                                                        );
-                                                                        setOpenMenuId(
-                                                                            null
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    💳 Paiement
-                                                                </button>
-                                                            )}
+                                                            {!scelle && !valide &&
+                                                                hasPermission(
+                                                                    "sorties.payer"
+                                                                ) && (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="actions-menu-item payment"
+                                                                        onClick={() => {
+                                                                            ouvrirPaiement(
+                                                                                sortie
+                                                                            );
+                                                                            setOpenMenuId(
+                                                                                null
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        💳
+                                                                        Paiement
+                                                                    </button>
+                                                                )}
 
-                                                            {hasPermission("sorties.delete") && (
+                                                            <button
+                                                                type="button"
+                                                                className="actions-menu-item print"
+                                                                onClick={() => {
+                                                                    ouvrirRecu(
+                                                                        sortie
+                                                                    );
+                                                                    setOpenMenuId(
+                                                                        null
+                                                                    );
+                                                                }}
+                                                            >
+                                                                🖨 Imprimer le
+                                                                reçu
+                                                            </button>
+
+                                                            {!scelle && hasPermission(
+                                                                "sorties.delete"
+                                                            ) && (
                                                                 <button
                                                                     type="button"
                                                                     className="actions-menu-item delete"
@@ -1392,28 +1832,97 @@ export default function Sortie() {
                                 )}
                             </div>
 
-                            {/* CHAPELLE */}
+                            {/* CHAPELLE + DURÉE LEVÉE */}
                             <div className="form-section">
                                 <div className="section-title">Chapelle</div>
 
-                                <div className="form-group">
-                                    <label>Sélectionner une chapelle</label>
-                                    <select
-                                        name="chapelle_id"
-                                        value={form.chapelle_id}
-                                        onChange={handleChange}
-                                    >
-                                        <option value="">Aucune chapelle</option>
-                                        {chapelles.map((chapelle) => (
-                                            <option
-                                                key={chapelle.id}
-                                                value={chapelle.id}
-                                            >
-                                                {chapelle.nom}
+                                <div className="form-grid">
+                                    <div className="form-group">
+                                        <label>Sélectionner une chapelle</label>
+                                        <select
+                                            name="chapelle_id"
+                                            value={form.chapelle_id}
+                                            onChange={handleChange}
+                                        >
+                                            <option value="">
+                                                Aucune chapelle
                                             </option>
-                                        ))}
-                                    </select>
+                                            {chapelles.map((chapelle) => (
+                                                <option
+                                                    key={chapelle.id}
+                                                    value={chapelle.id}
+                                                >
+                                                    {chapelle.nom}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* ✅ Durée de la levée affichée seulement si chapelle choisie */}
+                                    {form.chapelle_id && (
+                                        <div className="form-group">
+                                            <label>
+                                                Durée de la levée de corps *
+                                            </label>
+                                            <select
+                                                name="duree_levee"
+                                                value={form.duree_levee}
+                                                onChange={handleChange}
+                                                required
+                                            >
+                                                {DUREES_LEVEE.map((d) => (
+                                                    <option
+                                                        key={d.value}
+                                                        value={d.value}
+                                                    >
+                                                        {d.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
+
+                                {/* ✅ Message de conflit */}
+                                {form.chapelle_id && conflitChapelle && (
+                                    <div className="alert alert-danger">
+                                        ⚠ La chapelle n'est pas libre sur ce
+                                        créneau. Elle est occupée de{" "}
+                                        <strong>
+                                            {formatHeure(
+                                                conflitChapelle.intervalle
+                                                    .debut
+                                            )}
+                                        </strong>{" "}
+                                        à{" "}
+                                        <strong>
+                                            {formatHeure(
+                                                conflitChapelle.intervalle.fin
+                                            )}
+                                        </strong>{" "}
+                                        (Lévée de{" "}
+                                        {nomDefunt(
+                                            conflitChapelle.sortie.depot
+                                        )}
+                                        ).
+                                    </div>
+                                )}
+
+                                {/* ✅ Rappel du créneau sélectionné */}
+                                {form.chapelle_id && intervalleDemande && (
+                                    <div className="creneau-info">
+                                        Créneau sélectionné :{" "}
+                                        <strong>
+                                            {formatHeure(
+                                                intervalleDemande.debut
+                                            )}{" "}
+                                            →{" "}
+                                            {formatHeure(
+                                                intervalleDemande.fin
+                                            )}
+                                        </strong>
+                                    </div>
+                                )}
                             </div>
 
                             {/* APERÇU FINANCIER */}
@@ -1466,7 +1975,13 @@ export default function Sortie() {
                                 >
                                     Annuler
                                 </button>
-                                <button type="submit" className="btn-primary">
+                                <button
+                                    type="submit"
+                                    className="btn-primary"
+                                    disabled={
+                                        !!form.chapelle_id && !!conflitChapelle
+                                    }
+                                >
                                     {form.id
                                         ? "Enregistrer les modifications"
                                         : "Enregistrer la sortie"}

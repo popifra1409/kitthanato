@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import "./DashboardDeclaration.css";
 import DeclarationDeces from "./DeclarationDeces";
 
@@ -404,13 +405,25 @@ export default function DashboardDeclaration() {
     ===================================================== */
 
     const imprimer = (declaration) => {
-        setDeclarationAImprimer(declaration);
+    setDeclarationAImprimer(declaration);
+};
 
-        /* On attend que le composant soit rendu avant d'imprimer */
-        setTimeout(() => {
-            window.print();
-        }, 500);
+/* Lance l'impression une fois la déclaration rendue */
+useEffect(() => {
+    if (!declarationAImprimer) return;
+
+    const fin = () => setDeclarationAImprimer(null);
+    window.addEventListener("afterprint", fin);
+
+    const minuteur = setTimeout(() => {
+        window.print();
+    }, 300);
+
+    return () => {
+        clearTimeout(minuteur);
+        window.removeEventListener("afterprint", fin);
     };
+}, [declarationAImprimer]);
 
     /* =====================================================
        FERMER L'IMPRESSION APRÈS
@@ -1101,11 +1114,16 @@ export default function DashboardDeclaration() {
                IMPRESSION → utilise DeclarationDeces
             ================================================= */}
 
-            {declarationAImprimer && (
-                <div className="declaration-print-container">
-                    <DeclarationDeces declaration={declarationAImprimer} />
-                </div>
-            )}
+            {declarationAImprimer &&
+    createPortal(
+        <div className="declaration-print-container">
+            <DeclarationDeces
+                key={declarationAImprimer.id}
+                declaration={declarationAImprimer}
+            />
+        </div>,
+        document.body
+    )}
         </div>
     );
 }

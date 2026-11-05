@@ -50,6 +50,7 @@ class Depot extends Model
         'prestations',
         'montant_prestations',
         'statut',
+        'box_name',
     ];
 
     protected $casts = [
@@ -57,6 +58,9 @@ class Depot extends Model
         'date_deces' => 'date',
         'date_arrivee' => 'date',
         'date_sortie' => 'date',
+
+        'scelle' => 'boolean',
+        'scelle_le' => 'datetime',
 
         'age' => 'integer',
 
@@ -102,4 +106,21 @@ class Depot extends Model
     {
         return $this->hasMany(Transfert::class);
     }
+
+     public function depositants()
+    {
+        return $this->hasMany(\App\Models\Deposant::class);
+    }
+
+    public function scelleur()
+{
+    return $this->belongsTo(\App\Models\User::class, 'scelle_par')
+        ->withTrashed()->select('id', 'name');
+}
+
+public function estScelle(): bool
+{
+    return (bool) $this->scelle;
+}
+
 }

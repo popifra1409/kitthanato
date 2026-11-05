@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import "./DepotCorps.css";
 import ConfirmDialog from "../components/ConfirmDialog";
 import NotificationBox from "../components/NotificationBox";
@@ -7,20 +7,93 @@ import api, { asList } from "../services/api";
 import { hasPermission } from "../services/session";
 
 /* =========================================================
-   CALCUL DU PRÉFIXE ANNÉE
+   PRÉFIXE ANNÉE POUR LE CODE DÉPÔT (26PA)
 ========================================================= */
 const getPrefixeAnnee = () => {
     const annee = new Date().getFullYear();
-    const court = String(annee).slice(-2);   // "26", "27", "30"
+    const court = String(annee).slice(-2);
     return `${court}PA`;
 };
 
 const PREFIXE_ANNEE = getPrefixeAnnee();
 
+/* =========================================================
+   PRÉVISUALISATION DU CODE DÉFUNT (NOV0001)
+   Le backend reste la source de vérité.
+========================================================= */
+const MOIS_COURTS = [
+    "JAN", "FEV", "MAR", "AVR", "MAI", "JUI",
+    "JUL", "AOU", "SEP", "OCT", "NOV", "DEC",
+];
+
+const getPrefixeMois = (date = new Date()) => MOIS_COURTS[date.getMonth()];
+
+const extraireNumero = (code, prefixe) => {
+    if (!code || !String(code).startsWith(prefixe)) return 0;
+    const n = parseInt(String(code).slice(prefixe.length), 10);
+    return Number.isFinite(n) ? n : 0;
+};
+
+const prochainCodeDefunt = (depots) => {
+    const prefixe = getPrefixeMois();
+    const max = (depots || []).reduce(
+        (m, d) => Math.max(m, extraireNumero(d.code_defunt, prefixe)),
+        0
+    );
+    return `${prefixe}${String(max + 1).padStart(4, "0")}`;
+};
+
+/* =========================================================
+   OUTILS ÂGE ↔ DATE DE NAISSANCE
+========================================================= */
+const dateNaissanceDepuisAge = (ageStr) => {
+    const age = Number(ageStr);
+    if (!Number.isFinite(age) || age < 0 || age > 150) return "";
+    const annee = new Date().getFullYear() - age;
+    return `${annee}-01-01`;
+};
+
+const ageDepuisDateNaissance = (dateStr) => {
+    if (!dateStr) return "";
+    const naissance = new Date(`${dateStr}T00:00:00`);
+    if (Number.isNaN(naissance.getTime())) return "";
+
+    const aujourdHui = new Date();
+    let age = aujourdHui.getFullYear() - naissance.getFullYear();
+
+    const mois = aujourdHui.getMonth() - naissance.getMonth();
+    if (
+        mois < 0 ||
+        (mois === 0 && aujourdHui.getDate() < naissance.getDate())
+    ) {
+        age--;
+    }
+    return age < 0 ? "" : String(age);
+};
+
+/* =========================================================
+   ÉTAPES DU FORMULAIRE
+========================================================= */
+const ETAPES = [
+    "Défunt",
+    "Décès et arrivée",
+    "Provenance et emplacement",
+    "Déposants",
+];
+
+const deposantVide = () => ({
+    nom: "",
+    telephone: "",
+    cni: "",
+    lien_parente: "",
+});
+
 function DepotCorps() {
-    // =========================================================
-    // ÉTATS
-    // =========================================================
+    const getNomEnregistreur = (depot) => depot?.createur?.name || "-";
+
+    /* =====================================================
+       ÉTATS
+    ===================================================== */
 
     const [depots, setDepots] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -33,7 +106,9 @@ function DepotCorps() {
     const [selectedDepot, setSelectedDepot] = useState(null);
     const [editingId, setEditingId] = useState(null);
 
-    /* ---------- Confirmation ---------- */
+    const [currentStep, setCurrentStep] = useState(1);
+
+    /* Confirmation */
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmConfig, setConfirmConfig] = useState({
         title: "",
@@ -44,83 +119,88 @@ function DepotCorps() {
     });
     const [confirmLoading, setConfirmLoading] = useState(false);
 
-    /* ---------- Notification ---------- */
+    /* Notification */
     const [notif, setNotif] = useState({
         open: false,
         type: "success",
         title: "",
         message: "",
     });
-//action 
-const [openMenuId, setOpenMenuId] = useState(null);
-    // Professions
+
+    /* Menu actions */
+    const [openMenuId, setOpenMenuId] = useState(null);
+
+    /* Professions */
     const [professions, setProfessions] = useState([]);
     const [professionRecherchee, setProfessionRecherchee] = useState("");
     const [afficherProfessions, setAfficherProfessions] = useState(false);
 
-    // Prestations
+    /* Prestations */
     const [prestations, setPrestations] = useState([]);
     const [prestationsSelectionnees, setPrestationsSelectionnees] = useState([]);
     const [montantPrestations, setMontantPrestations] = useState(0);
     const [loadingPrestations, setLoadingPrestations] = useState(true);
-//service
-// Services d'origine
-const [services, setServices] = useState([]);
-const [serviceRecherche, setServiceRecherche] = useState("");
-const [afficherServices, setAfficherServices] = useState(false);
-    // =========================================================
-    // FORMULAIRE
-    // =========================================================
+
+    /* Services d'origine */
+    const [services, setServices] = useState([]);
+    const [serviceRecherche, setServiceRecherche] = useState("");
+    const [afficherServices, setAfficherServices] = useState(false);
+
+    /* Déposants */
+    const [deposants, setDeposants] = useState([]);
+    const [deposantCourant, setDeposantCourant] = useState(deposantVide());
+
+    /* Box */
+    const [boxOpen, setBoxOpen] = useState(false);
+    const [boxDepot, setBoxDepot] = useState(null);
+    const [boxName, setBoxName] = useState("");
+    const [boxLoading, setBoxLoading] = useState(false);
+
+    /* =====================================================
+       FORMULAIRE
+    ===================================================== */
 
     const initialForm = {
-        code: "",
-        code_defunt: "",
-
+        code: "",          // ex: 26PA00015 (saisi)
+        code_defunt: "",   // ex: NOV0001 (auto, lecture seule)
         nom: "",
         prenom: "",
         sexe: "",
-
         date_naissance: "",
         age: "",
-
         profession: "",
-
         date_deces: "",
         heure_deces: "",
-
         date_arrivee: "",
         heure_arrivee: "",
-
         date_sortie: "",
-
         provenance: "",
         service_origine: "",
         lieu_provenance: "",
         motif: "",
-
         etat: "",
         emplacement: "",
         chapelle: "",
-
-        contact_nom: "",
-        contact_telephone: "",
-        contact_cni: "",
-        lien_parente: "",
     };
 
     const [formData, setFormData] = useState(initialForm);
 
-    // =========================================================
-    // HELPERS MODALES
-    // =========================================================
+    /* Prévisualisation du prochain code_defunt */
+    const prochainDefuntPreview = useMemo(
+        () => prochainCodeDefunt(depots),
+        [depots]
+    );
+
+    /* =====================================================
+       HELPERS MODALES
+    ===================================================== */
 
     const showNotif = (type, title, message = "") => {
         setNotif({ open: true, type, title, message });
     };
 
-    const closeNotif = () => {
+    const closeNotif = () =>
         setNotif((prev) => ({ ...prev, open: false }));
-    };
 
     const openConfirm = (config) => {
         setConfirmConfig({
@@ -151,29 +231,25 @@ const [afficherServices, setAfficherServices] = useState(false);
         }
     };
 
-    // =========================================================
-    // FORMAT DATE
-    // =========================================================
+    /* =====================================================
+       FORMAT DATE
+    ===================================================== */
 
     const formatDateForInput = (date) => {
         if (!date) return "";
-
         const value = String(date);
-
         if (value.includes("T")) return value.split("T")[0];
         if (value.includes(" ")) return value.split(" ")[0];
-
         return value;
     };
 
-    // =========================================================
-    // CHARGER LES DEPOTS
-    // =========================================================
+    /* =====================================================
+       CHARGEMENTS
+    ===================================================== */
 
     const fetchDepots = async () => {
         try {
             setLoading(true);
-
             const data = await api.depots.list();
             setDepots(asList(data, "depots"));
         } catch (error) {
@@ -189,109 +265,47 @@ const [afficherServices, setAfficherServices] = useState(false);
         }
     };
 
-    // =========================================================
-    // PROFESSIONS
-    // =========================================================
-
     const chargerProfessions = async (recherche = "") => {
         try {
-            const data = asList(await api.professions.list(recherche), "professions");
-
+            const data = asList(
+                await api.professions.list(recherche),
+                "professions"
+            );
             setProfessions(data);
         } catch (error) {
             console.error(error);
             setProfessions([]);
         }
     };
-// // =========================================================
-// SERVICES D'ORIGINE
-// =========================================================
 
-const chargerServices = async (recherche = "") => {
-    try {
-        const data = asList(await api.services.list(recherche), "services");
-
-        setServices(data);
-    } catch (error) {
-        console.error("Erreur de chargement des services :", error);
-        setServices([]);
-    }
-};
-
-const selectionnerService = (service) => {
-    const nom = service.nom || "";
-
-    setFormData((prev) => ({
-        ...prev,
-        service_origine: nom,
-    }));
-
-    setServiceRecherche(nom);
-    setAfficherServices(false);
-};
-
-const ajouterService = async () => {
-    const nom = serviceRecherche.trim();
-
-    if (!nom) {
-        showNotif(
-            "error",
-            "Champ manquant",
-            "Veuillez saisir le nom du service."
-        );
-        return;
-    }
-
-    try {
-        const cree = await api.services.create(nom);
-
-        const nouveauService = cree?.nom || nom;
-
-        setFormData((prev) => ({
-            ...prev,
-            service_origine: nouveauService,
-        }));
-
-        setServiceRecherche(nouveauService);
-        setAfficherServices(false);
-
-        await chargerServices();
-
-    } catch (error) {
-        console.error(error);
-
-        showNotif(
-            "error",
-            "Échec",
-            error.firstMessage ||
-                "Impossible d'ajouter le service."
-        );
-    }
-};
-
-    // =========================================================
-    // PRESTATIONS
-    // =========================================================
+    const chargerServices = async (recherche = "") => {
+        try {
+            const data = asList(
+                await api.services.list(recherche),
+                "services"
+            );
+            setServices(data);
+        } catch (error) {
+            console.error("Erreur de chargement des services :", error);
+            setServices([]);
+        }
+    };
 
     const fetchPrestations = async () => {
         try {
             setLoadingPrestations(true);
-
-            const data = asList(await api.prestations.list(), "prestations");
-
+            const data = asList(
+                await api.prestations.list(),
+                "prestations"
+            );
             setPrestations(data);
         } catch (error) {
             console.error(error);
             setPrestations([]);
-            
         } finally {
             setLoadingPrestations(false);
         }
     };
-
-    // =========================================================
-    // CHARGEMENT INITIAL
-    // =========================================================
 
     useEffect(() => {
         fetchDepots();
@@ -300,19 +314,40 @@ const ajouterService = async () => {
         fetchPrestations();
     }, []);
 
-    // =========================================================
-    // action
-    // =========================================================
-
+    /* Fermeture menu actions */
     useEffect(() => {
-    const fermerMenu = () => setOpenMenuId(null);
-    document.addEventListener("click", fermerMenu);
-    return () => document.removeEventListener("click", fermerMenu);
-}, []);
+        const fermerMenu = () => setOpenMenuId(null);
+        document.addEventListener("click", fermerMenu);
+        return () =>
+            document.removeEventListener("click", fermerMenu);
+    }, []);
 
-    // =========================================================
-    // CALCUL TOTAL PRESTATIONS
-    // =========================================================
+    /* Fermeture suggestions */
+    useEffect(() => {
+        const fermer = (e) => {
+            if (e.type === "keydown") {
+                if (e.key === "Escape") {
+                    setAfficherProfessions(false);
+                    setAfficherServices(false);
+                }
+                return;
+            }
+            if (!e.target.closest(".profession-container")) {
+                setAfficherProfessions(false);
+                setAfficherServices(false);
+            }
+        };
+        document.addEventListener("mousedown", fermer);
+        document.addEventListener("keydown", fermer);
+        return () => {
+            document.removeEventListener("mousedown", fermer);
+            document.removeEventListener("keydown", fermer);
+        };
+    }, []);
+
+    /* =====================================================
+       TOTAL PRESTATIONS
+    ===================================================== */
 
     useEffect(() => {
         const total = prestations
@@ -324,73 +359,53 @@ const ajouterService = async () => {
                     somme + Number(prestation.prix || 0),
                 0
             );
-
         setMontantPrestations(total);
     }, [prestations, prestationsSelectionnees]);
 
-    // =========================================================
-    // CHANGEMENT FORMULAIRE
-    // =========================================================
+    /* =====================================================
+       CHANGEMENT FORMULAIRE
+    ===================================================== */
 
     const handleChange = (e) => {
         const { name, value } = e.target;
 
+        /* Date de naissance → âge */
         if (name === "date_naissance") {
-            let age = "";
-
-            if (value) {
-                const naissance = new Date(`${value}T00:00:00`);
-                const aujourdHui = new Date();
-
-                age = aujourdHui.getFullYear() - naissance.getFullYear();
-
-                const mois = aujourdHui.getMonth() - naissance.getMonth();
-
-                if (
-                    mois < 0 ||
-                    (mois === 0 &&
-                        aujourdHui.getDate() < naissance.getDate())
-                ) {
-                    age--;
-                }
-
-                if (age < 0) age = "";
-            }
-
             setFormData((prev) => ({
                 ...prev,
                 date_naissance: value,
-                age,
+                age: ageDepuisDateNaissance(value),
             }));
-
             return;
         }
 
-        setFormData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
+        /* Âge → date de naissance (approximatif) */
+        if (name === "age") {
+            const dateAuto = dateNaissanceDepuisAge(value);
+            setFormData((prev) => ({
+                ...prev,
+                age: value,
+                date_naissance: dateAuto || prev.date_naissance,
+            }));
+            return;
+        }
+
+        setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
-    // =========================================================
-    // PROFESSION
-    // =========================================================
+    /* =====================================================
+       PROFESSION
+    ===================================================== */
 
     const selectionnerProfession = (profession) => {
         const nom = profession.nom || "";
-
-        setFormData((prev) => ({
-            ...prev,
-            profession: nom,
-        }));
-
+        setFormData((prev) => ({ ...prev, profession: nom }));
         setProfessionRecherchee(nom);
         setAfficherProfessions(false);
     };
 
     const ajouterProfession = async () => {
         const nom = professionRecherchee.trim();
-
         if (!nom) {
             showNotif(
                 "error",
@@ -399,184 +414,386 @@ const ajouterService = async () => {
             );
             return;
         }
-
         try {
             const creee = await api.professions.create(nom);
-
-            const nouvelleProfession = creee?.nom || nom;
-
-            setFormData((prev) => ({
-                ...prev,
-                profession: nouvelleProfession,
-            }));
-
-            setProfessionRecherchee(nouvelleProfession);
+            const nouvelle = creee?.nom || nom;
+            setFormData((prev) => ({ ...prev, profession: nouvelle }));
+            setProfessionRecherchee(nouvelle);
             setAfficherProfessions(false);
-
             await chargerProfessions();
-
         } catch (error) {
             console.error(error);
             showNotif(
                 "error",
                 "Échec",
-                error.firstMessage ||
-                    "Impossible d'ajouter la profession."
+                error.firstMessage || "Impossible d'ajouter la profession."
             );
         }
     };
 
-    // =========================================================
-    // PRESTATIONS
-    // =========================================================
+    /* =====================================================
+       SERVICE
+    ===================================================== */
+
+    const selectionnerService = (service) => {
+        const nom = service.nom || "";
+        setFormData((prev) => ({ ...prev, service_origine: nom }));
+        setServiceRecherche(nom);
+        setAfficherServices(false);
+    };
+
+    const ajouterService = async () => {
+        const nom = serviceRecherche.trim();
+        if (!nom) {
+            showNotif(
+                "error",
+                "Champ manquant",
+                "Veuillez saisir le nom du service."
+            );
+            return;
+        }
+        try {
+            const cree = await api.services.create(nom);
+            const nouveau = cree?.nom || nom;
+            setFormData((prev) => ({ ...prev, service_origine: nouveau }));
+            setServiceRecherche(nouveau);
+            setAfficherServices(false);
+            await chargerServices();
+        } catch (error) {
+            console.error(error);
+            showNotif(
+                "error",
+                "Échec",
+                error.firstMessage || "Impossible d'ajouter le service."
+            );
+        }
+    };
+
+    /* =====================================================
+       PRESTATIONS
+    ===================================================== */
 
     const handlePrestationChange = (id) => {
         const numericId = Number(id);
-
         setPrestationsSelectionnees((prev) => {
             if (prev.includes(numericId)) {
                 return prev.filter((item) => item !== numericId);
             }
-
             return [...prev, numericId];
         });
     };
 
-    // =========================================================
-    // NOUVEAU DEPOT
-    // =========================================================
+    /* =====================================================
+       DÉPOSANTS
+    ===================================================== */
 
-    const openNewForm = () => {
-        setEditingId(null);
-        setFormData({ ...initialForm });
+    const handleDeposantChange = (e) => {
+        const { name, value } = e.target;
+        setDeposantCourant((prev) => ({ ...prev, [name]: value }));
+    };
 
+    const ajouterDeposant = () => {
+        if (!deposantCourant.nom.trim()) {
+            showNotif(
+                "error",
+                "Champ manquant",
+                "Veuillez saisir le nom du déposant."
+            );
+            return;
+        }
+        setDeposants((prev) => [
+            ...prev,
+            {
+                ...deposantCourant,
+                nom: deposantCourant.nom.trim(),
+                statut: prev.length === 0 ? "principal" : "secondaire",
+            },
+        ]);
+        setDeposantCourant(deposantVide());
+    };
+
+    const definirPrincipal = (index) => {
+        setDeposants((prev) =>
+            prev.map((d, i) => ({
+                ...d,
+                statut: i === index ? "principal" : "secondaire",
+            }))
+        );
+    };
+
+    const retirerDeposant = (index) => {
+        setDeposants((prev) => {
+            const reste = prev.filter((_, i) => i !== index);
+            if (
+                reste.length > 0 &&
+                !reste.some((d) => d.statut === "principal")
+            ) {
+                reste[0] = { ...reste[0], statut: "principal" };
+            }
+            return reste;
+        });
+    };
+
+    const corrigerDeposant = (index) => {
+        const d = deposants[index];
+        setDeposantCourant({
+            nom: d.nom || "",
+            telephone: d.telephone || "",
+            cni: d.cni || "",
+            lien_parente: d.lien_parente || "",
+        });
+        retirerDeposant(index);
+    };
+
+    /* =====================================================
+       NAVIGATION
+    ===================================================== */
+
+    const validerEtape = (etape) => {
+        const erreur = (message) => {
+            showNotif("error", "Champ manquant", message);
+            return false;
+        };
+
+        if (etape === 1) {
+            if (!formData.code)
+                return erreur("Veuillez saisir le code du dépôt.");
+            if (!formData.nom.trim())
+                return erreur("Veuillez saisir le nom du défunt.");
+            if (!formData.sexe)
+                return erreur("Veuillez sélectionner le sexe.");
+            if (!formData.date_naissance && !formData.age) {
+                return erreur(
+                    "Veuillez renseigner la date de naissance ou l'âge."
+                );
+            }
+        }
+
+        if (etape === 2) {
+            if (!formData.date_deces)
+                return erreur("Veuillez renseigner la date du décès.");
+            if (!formData.date_arrivee)
+                return erreur("Veuillez renseigner la date d'arrivée.");
+        }
+
+        if (etape === 3) {
+            if (!formData.provenance)
+                return erreur("Veuillez sélectionner la provenance.");
+            if (
+                formData.provenance === "Interne" &&
+                !formData.service_origine
+            ) {
+                return erreur(
+                    "Veuillez sélectionner le service d'origine."
+                );
+            }
+            if (
+                formData.provenance === "Externe" &&
+                !formData.lieu_provenance
+            ) {
+                return erreur(
+                    "Veuillez renseigner le lieu de provenance."
+                );
+            }
+            if (!formData.etat)
+                return erreur("Veuillez sélectionner l'état du corps.");
+            if (!formData.emplacement)
+                return erreur("Veuillez sélectionner l'emplacement.");
+        }
+
+        return true;
+    };
+
+    const etapeSuivante = () => {
+        if (!validerEtape(currentStep)) return;
+        setCurrentStep((s) => Math.min(ETAPES.length, s + 1));
+    };
+
+    const etapePrecedente = () => {
+        setCurrentStep((s) => Math.max(1, s - 1));
+    };
+
+    /* =====================================================
+       RESET / NOUVEAU / FERMER
+    ===================================================== */
+
+    const resetFormulaire = () => {
+        setFormData({
+            ...initialForm,
+            /* Prévisualisation du prochain code_defunt */
+            code_defunt: prochainDefuntPreview,
+        });
         setProfessionRecherchee("");
         setAfficherProfessions(false);
         setServiceRecherche("");
         setAfficherServices(false);
         setPrestationsSelectionnees([]);
-
-        setShowForm(true);
+        setDeposants([]);
+        setDeposantCourant(deposantVide());
+        setCurrentStep(1);
     };
 
-    // =========================================================
-    // FERMER FORMULAIRE
-    // =========================================================
+    const openNewForm = () => {
+        setEditingId(null);
+        resetFormulaire();
+        setShowForm(true);
+    };
 
     const closeForm = () => {
         setShowForm(false);
         setEditingId(null);
-
-        setFormData({ ...initialForm });
-
-        setProfessionRecherchee("");
-        setAfficherProfessions(false);
-        setServiceRecherche("");
-        setAfficherServices(false);
-        setPrestationsSelectionnees([]);
+        resetFormulaire();
     };
 
-    // =========================================================
-    // MODIFIER
-    // =========================================================
+    /* =====================================================
+       DÉPOSANTS D'UN DÉPÔT
+    ===================================================== */
+
+    const getDeposantsDepot = (depot) => {
+        if (
+            Array.isArray(depot?.depositants) &&
+            depot.depositants.length > 0
+        ) {
+            return depot.depositants;
+        }
+        if (depot?.contact_nom) {
+            return [
+                {
+                    nom: depot.contact_nom,
+                    telephone: depot.contact_telephone,
+                    cni: depot.contact_cni,
+                    lien_parente: depot.lien_parente,
+                    statut: "principal",
+                },
+            ];
+        }
+        return [];
+    };
+
+    /* =====================================================
+       MODIFIER
+    ===================================================== */
 
     const editDepot = (depot) => {
         setEditingId(depot.id);
 
         const selectedPrestations = Array.isArray(depot.prestations)
-            ? depot.prestations.map((p) => Number(p.id ?? p)).filter(Boolean)
+            ? depot.prestations
+                  .map((p) => Number(p.id ?? p))
+                  .filter(Boolean)
             : [];
-
         setPrestationsSelectionnees(selectedPrestations);
-        setProfessionRecherchee(depot.profession || "");
-setServiceRecherche(depot.service_origine || "");
-setAfficherServices(false);
-        setFormData({
-code: (depot.code || "").replace(/^\d{2}PA/, ""),            code_defunt: depot.code_defunt || "",
 
+        setProfessionRecherchee(depot.profession || "");
+        setServiceRecherche(depot.service_origine || "");
+        setAfficherServices(false);
+
+        const liste = getDeposantsDepot(depot).map((d) => ({
+            nom: d.nom || "",
+            telephone: d.telephone || "",
+            cni: d.cni || "",
+            lien_parente: d.lien_parente || "",
+            statut: d.statut === "principal" ? "principal" : "secondaire",
+        }));
+        if (
+            liste.length > 0 &&
+            !liste.some((d) => d.statut === "principal")
+        ) {
+            liste[0].statut = "principal";
+        }
+        setDeposants(liste);
+        setDeposantCourant(deposantVide());
+        setCurrentStep(1);
+
+        /* Le préfixe 26PA reste affiché séparément */
+        const codeSansPrefixe = (depot.code || "").replace(
+            new RegExp(`^${PREFIXE_ANNEE}`),
+            ""
+        );
+
+        setFormData({
+            code: codeSansPrefixe,
+            code_defunt: depot.code_defunt || "",   // figé
             nom: depot.nom || "",
             prenom: depot.prenom || "",
             sexe: depot.sexe || "",
-
             date_naissance: formatDateForInput(depot.date_naissance),
             age: depot.age ?? "",
             profession: depot.profession || "",
-
             date_deces: formatDateForInput(depot.date_deces),
             heure_deces: depot.heure_deces
                 ? String(depot.heure_deces).substring(0, 5)
                 : "",
-
             date_arrivee: formatDateForInput(depot.date_arrivee),
             heure_arrivee: depot.heure_arrivee
                 ? String(depot.heure_arrivee).substring(0, 5)
                 : "",
-
             date_sortie: formatDateForInput(depot.date_sortie),
-
             provenance: depot.provenance || "",
             service_origine: depot.service_origine || "",
             lieu_provenance: depot.lieu_provenance || "",
             motif: depot.motif || "",
-
             etat: depot.etat || "",
             emplacement: depot.emplacement || "",
             chapelle: depot.chapelle || "",
-
-            contact_nom: depot.contact_nom || "",
-            contact_telephone: depot.contact_telephone || "",
-            contact_cni: depot.contact_cni || "",
-            lien_parente: depot.lien_parente || "",
         });
 
         setShowForm(true);
     };
 
-    // =========================================================
-    // ENREGISTRER
-    // =========================================================
+    /* =====================================================
+       ENREGISTRER
+       ⚠ On n'envoie PAS code_defunt : le backend le génère.
+    ===================================================== */
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!formData.date_naissance && !formData.age) {
+        if (currentStep < ETAPES.length) {
+            etapeSuivante();
+            return;
+        }
+
+        for (let s = 1; s < ETAPES.length; s++) {
+            if (!validerEtape(s)) {
+                setCurrentStep(s);
+                return;
+            }
+        }
+
+        let listeFinale = [...deposants];
+
+        if (deposantCourant.nom.trim()) {
+            listeFinale.push({
+                ...deposantCourant,
+                nom: deposantCourant.nom.trim(),
+                statut:
+                    listeFinale.length === 0 ? "principal" : "secondaire",
+            });
+        }
+
+        if (listeFinale.length === 0) {
             showNotif(
                 "error",
                 "Champ manquant",
-                "Veuillez renseigner la date de naissance ou l'âge."
+                "Veuillez ajouter au moins un déposant."
             );
             return;
         }
 
-        if (!formData.provenance) {
-            showNotif(
-                "error",
-                "Champ manquant",
-                "Veuillez sélectionner la provenance."
-            );
-            return;
+        if (!listeFinale.some((d) => d.statut === "principal")) {
+            listeFinale[0] = { ...listeFinale[0], statut: "principal" };
         }
 
-        if (
-            formData.provenance === "Interne" &&
-            !formData.service_origine
-        ) {
-            showNotif(
-                "error",
-                "Champ manquant",
-                "Veuillez sélectionner le service d'origine."
-            );
-            return;
-        }
+        const principal = listeFinale.find(
+            (d) => d.statut === "principal"
+        );
 
-        if (
-            formData.provenance === "Externe" &&
-            !formData.lieu_provenance
-        ) {
+        if (!principal.cni || !principal.cni.trim()) {
             showNotif(
                 "error",
                 "Champ manquant",
-                "Veuillez renseigner le lieu de provenance."
+                "Le CNI du déposant principal est obligatoire."
             );
             return;
         }
@@ -585,11 +802,16 @@ code: (depot.code || "").replace(/^\d{2}PA/, ""),            code_defunt: depot.
             const donnees = {
                 ...formData,
 
-code: `${PREFIXE_ANNEE}${formData.code}`,
+                /* code conservé au format 26PA00015 */
+                code: `${PREFIXE_ANNEE}${formData.code}`,
+
+                /* ❌ PAS de code_defunt dans le payload :
+                   le backend le génère à la création
+                   et le conserve à la modification. */
+
                 motif: formData.motif || "Non précisé",
                 etat: formData.etat || "Non précisé",
                 chapelle: formData.chapelle || "Aucune",
-
                 age: formData.age ? Number(formData.age) : null,
 
                 date_naissance: formData.date_naissance || null,
@@ -603,7 +825,6 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
                     formData.provenance === "Interne"
                         ? formData.service_origine
                         : null,
-
                 lieu_provenance:
                     formData.provenance === "Externe"
                         ? formData.lieu_provenance
@@ -611,6 +832,13 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
 
                 prestations: prestationsSelectionnees,
                 montant_prestations: montantPrestations,
+
+                depositants: listeFinale,
+
+                contact_nom: principal.nom,
+                contact_telephone: principal.telephone,
+                contact_cni: principal.cni,
+                lien_parente: principal.lien_parente,
             };
 
             if (editingId) {
@@ -634,59 +862,189 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
             showNotif(
                 "error",
                 "Échec",
-                error.firstMessage || error.message || "Impossible d'enregistrer le dépôt."
+                error.firstMessage ||
+                    error.message ||
+                    "Impossible d'enregistrer le dépôt."
             );
         }
     };
 
-    // =========================================================
-    // SUPPRESSION
-    // =========================================================
+    /* =====================================================
+       BOX
+    ===================================================== */
+
+    const ouvrirBox = (depot) => {
+        if ((depot.statut || "PRÉSENT") !== "PRÉSENT") {
+            showNotif(
+                "error",
+                "Action impossible",
+                "Un box ne peut être attribué qu'à un corps présent."
+            );
+            return;
+        }
+        setBoxDepot(depot);
+        setBoxName(depot.box_name || "");
+        setBoxOpen(true);
+    };
+
+    const fermerBox = () => {
+        if (boxLoading) return;
+        setBoxOpen(false);
+        setBoxDepot(null);
+        setBoxName("");
+    };
+
+    const enregistrerBox = async (e) => {
+        if (e) e.preventDefault();
+        const nom = boxName.trim();
+        if (!nom) {
+            showNotif(
+                "error",
+                "Champ manquant",
+                "Veuillez saisir le nom du box."
+            );
+            return;
+        }
+        try {
+            setBoxLoading(true);
+            if (typeof api.depots.assignBox === "function") {
+                await api.depots.assignBox(boxDepot.id, nom);
+            } else {
+                await api.depots.update(boxDepot.id, { box_name: nom });
+            }
+            setDepots((liste) =>
+                liste.map((d) =>
+                    d.id === boxDepot.id ? { ...d, box_name: nom } : d
+                )
+            );
+            setBoxOpen(false);
+            setBoxDepot(null);
+            setBoxName("");
+            showNotif(
+                "success",
+                "Box attribué",
+                `Le box « ${nom} » a été attribué.`
+            );
+        } catch (error) {
+            console.error(error);
+            showNotif(
+                "error",
+                "Échec",
+                error.firstMessage ||
+                    error.message ||
+                    "Impossible d'attribuer le box."
+            );
+        } finally {
+            setBoxLoading(false);
+        }
+    };
+
+    /* =====================================================
+       SCELLER / DESCELLER
+    ===================================================== */
+
+    const changerScelle = (depot, sceller) => {
+        if (sceller && (depot.statut || "PRÉSENT") !== "PRÉSENT") {
+            showNotif(
+                "error",
+                "Action impossible",
+                "Seul un corps présent peut être scellé."
+            );
+            return;
+        }
+        openConfirm({
+            title: sceller
+                ? "Sceller le corps ?"
+                : "Desceller le corps ?",
+            message: sceller
+                ? `Le corps de "${depot.nom || ""} ${
+                      depot.prenom || ""
+                  }" sera scellé.\n\nPlus aucune modification ne sera possible tant que l'administrateur ne l'aura pas descellé.`
+                : `Le corps de "${depot.nom || ""} ${
+                      depot.prenom || ""
+                  }" sera descellé et redeviendra modifiable.`,
+            confirmLabel: sceller ? "Sceller" : "Desceller",
+            type: "warning",
+            onConfirm: async () => {
+                try {
+                    const res = sceller
+                        ? await api.depots.sceller(depot.id)
+                        : await api.depots.desceller(depot.id);
+                    if (res?.depot) {
+                        setSelectedDepot((prev) =>
+                            prev && prev.id === depot.id
+                                ? { ...prev, ...res.depot }
+                                : prev
+                        );
+                    }
+                    showNotif(
+                        "success",
+                        sceller ? "Corps scellé" : "Corps descellé",
+                        sceller
+                            ? "Le corps ne peut plus être modifié."
+                            : "Le corps est de nouveau modifiable."
+                    );
+                    await fetchDepots();
+                } catch (error) {
+                    console.error(error);
+                    showNotif(
+                        "error",
+                        "Échec",
+                        error.firstMessage ||
+                            error.message ||
+                            "Opération impossible."
+                    );
+                    throw error;
+                }
+            },
+        });
+    };
+
+    /* =====================================================
+       SUPPRESSION
+    ===================================================== */
 
     const demanderSuppression = (depot) => {
-    openConfirm({
-        title: "Supprimer le dépôt ?",
-        message: `Le défunt "${depot.nom || ""} ${
-            depot.prenom || ""
-        }" sera définitivement supprimé.\n\nCette action est irréversible.`,
-        confirmLabel: "Supprimer",
-        type: "danger",
-        onConfirm: async () => {
-            try {
-                await api.depots.remove(depot.id);
-
-                showNotif(
-                    "success",
-                    "Dépôt supprimé",
-                    "Le dépôt a été supprimé avec succès."
-                );
-
-                if (selectedDepot?.id === depot.id) {
-                    setShowDetails(false);
-                    setSelectedDepot(null);
+        openConfirm({
+            title: "Supprimer le dépôt ?",
+            message: `Le défunt "${depot.nom || ""} ${
+                depot.prenom || ""
+            }" sera définitivement supprimé.\n\nCette action est irréversible.`,
+            confirmLabel: "Supprimer",
+            type: "danger",
+            onConfirm: async () => {
+                try {
+                    await api.depots.remove(depot.id);
+                    showNotif(
+                        "success",
+                        "Dépôt supprimé",
+                        "Le dépôt a été supprimé avec succès."
+                    );
+                    if (selectedDepot?.id === depot.id) {
+                        setShowDetails(false);
+                        setSelectedDepot(null);
+                    }
+                    await fetchDepots();
+                } catch (error) {
+                    console.error(error);
+                    showNotif(
+                        "error",
+                        "Échec",
+                        error.message ||
+                            "Erreur lors de la suppression."
+                    );
+                    throw error;
                 }
+            },
+        });
+    };
 
-                await fetchDepots();
-            } catch (error) {
-                console.error(error);
-                showNotif(
-                    "error",
-                    "Échec",
-                    error.message || "Erreur lors de la suppression."
-                );
-                throw error;
-            }
-        },
-    });
-};
-
-    // =========================================================
-    // RECHERCHE
-    // =========================================================
+    /* =====================================================
+       RECHERCHE
+    ===================================================== */
 
     const depotsFiltres = depots.filter((depot) => {
         const recherche = search.toLowerCase().trim();
-
         if (!recherche) return true;
 
         const texte = [
@@ -698,6 +1056,7 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
             depot.service_origine,
             depot.lieu_provenance,
             depot.emplacement,
+            depot.box_name,
             depot.chapelle,
             depot.contact_nom,
             depot.statut,
@@ -705,25 +1064,23 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
             .filter(Boolean)
             .join(" ")
             .toLowerCase();
-
         return texte.includes(recherche);
     });
 
-    // =========================================================
-    // DATES MIN / MAX
-    // =========================================================
+    /* =====================================================
+       DATES MIN / MAX
+    ===================================================== */
 
     const aujourdHui = new Date();
     aujourdHui.setMinutes(
         aujourdHui.getMinutes() - aujourdHui.getTimezoneOffset()
     );
-
     const maxDate = aujourdHui.toISOString().split("T")[0];
     const minDate = maxDate;
 
-    // =========================================================
-    // AFFICHAGE
-    // =========================================================
+    /* =====================================================
+       AFFICHAGE
+    ===================================================== */
 
     return (
         <div className="depot-page">
@@ -731,7 +1088,6 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
             <div className="depot-header">
                 <div className="depot-title-line">
                     <h1> Dépôt des corps</h1>
-
                     <div className="depot-total">
                         {depots.length} dépôt
                         {depots.length !== 1 ? "s" : ""}
@@ -743,14 +1099,12 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
             <div className="depot-toolbar">
                 <div className="search-container">
                     <span className="search-icon">🔍</span>
-
                     <input
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Rechercher par code, nom, provenance..."
+                        placeholder="Rechercher par code, nom, provenance, box..."
                     />
-
                     {search && (
                         <button
                             type="button"
@@ -775,13 +1129,12 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
 
             {/* TABLEAU */}
             <div className="depot-table-card">
-                
                 <div className="table-wrapper">
                     <table className="depot-table">
                         <thead>
                             <tr>
-                                <th>Code</th>
                                 <th>Code défunt</th>
+                                <th>Code dépôt</th>
                                 <th>Nom du défunt</th>
                                 <th>Date décès</th>
                                 <th>Provenance</th>
@@ -797,25 +1150,24 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td
-                                        colSpan="11"
-                                        className="table-loading"
-                                    >
+                                    <td colSpan="11" className="table-loading">
                                         Chargement des dépôts...
                                     </td>
                                 </tr>
                             ) : depotsFiltres.length === 0 ? (
                                 <tr>
-                                    <td
-                                        colSpan="11"
-                                        className="table-empty"
-                                    >
+                                    <td colSpan="11" className="table-empty">
                                         Aucun dépôt trouvé.
                                     </td>
                                 </tr>
                             ) : (
                                 depotsFiltres.map((depot) => (
-                                    <tr key={depot.id}>
+                                    <tr
+                                        key={depot.id}
+                                        className={
+                                            depot.scelle ? "ligne-scellee" : ""
+                                        }
+                                    >
                                         <td>
                                             <span className="code-badge">
                                                 {depot.code || "-"}
@@ -856,10 +1208,15 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
                                             </span>
                                         </td>
 
-                                        <td>
+                                        <td className="emplacement-cell">
                                             <span className="emplacement-badge">
                                                 {depot.emplacement || "-"}
                                             </span>
+                                            {depot.box_name && (
+                                                <span className="box-badge">
+                                                    {depot.box_name}
+                                                </span>
+                                            )}
                                         </td>
 
                                         <td>
@@ -871,76 +1228,148 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
                                         <td className="deposant-cell">
                                             {depot.contact_nom || "-"}
                                             <br />
-                                            <span>{depot.contact_telephone || ""}</span>
+                                            <span>
+                                                {depot.contact_telephone || ""}
+                                            </span>
                                             <br />
-                                         <span>CNI : {depot.contact_cni || ""}</span>
-                                        </td>
-
-                                        <td>
-                                            <span className="depot-status status-present">
-                                                {depot.statut || "PRÉSENT"}
+                                            <span>
+                                                CNI :{" "}
+                                                {depot.contact_cni || ""}
                                             </span>
                                         </td>
 
                                         <td>
-    <div className="actions-menu-container">
-        <button
-            type="button"
-            className="actions-menu-trigger"
-            onClick={(e) => {
-                e.stopPropagation();   // empêche la fermeture immédiate
-                setOpenMenuId(openMenuId === depot.id ? null : depot.id);
-            }}
-        >
-            ⋮
-        </button>
+                                            <span
+                                                className={`depot-status ${
+                                                    depot.scelle
+                                                        ? "status-scelle"
+                                                        : depot.statut === "SORTI"
+                                                        ? "status-sorti"
+                                                        : depot.statut === "TRANSFÉRÉ"
+                                                        ? "status-transfere"
+                                                        : "status-present"
+                                                }`}
+                                            >
+                                                {depot.scelle
+                                                    ? "🔒 SCELLÉ"
+                                                    : depot.statut ||
+                                                      "PRÉSENT"}
+                                            </span>
+                                        </td>
 
-        {openMenuId === depot.id && (
-            <div
-                className="actions-menu-dropdown"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <button
-                    type="button"
-                    className="actions-menu-item view"
-                    onClick={() => {
-                        setSelectedDepot(depot);
-                        setShowDetails(true);
-                        setOpenMenuId(null);
-                    }}
-                >
-                    👁 Voir les détails
-                </button>
+                                        <td>
+                                            <div className="actions-menu-container">
+                                                <button
+                                                    type="button"
+                                                    className="actions-menu-trigger"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setOpenMenuId(
+                                                            openMenuId ===
+                                                                depot.id
+                                                                ? null
+                                                                : depot.id
+                                                        );
+                                                    }}
+                                                >
+                                                    ⋮
+                                                </button>
 
-                {hasPermission("depots.update") && (
-                    <button
-                        type="button"
-                        className="actions-menu-item edit"
-                        onClick={() => {
-                            editDepot(depot);
-                            setOpenMenuId(null);
-                        }}
-                    >
-                        ✏ Modifier
-                    </button>
-                )}
+                                                {openMenuId === depot.id && (
+                                                    <div
+                                                        className="actions-menu-dropdown"
+                                                        onClick={(e) =>
+                                                            e.stopPropagation()
+                                                        }
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            className="actions-menu-item view"
+                                                            onClick={() => {
+                                                                setSelectedDepot(depot);
+                                                                setShowDetails(true);
+                                                                setOpenMenuId(null);
+                                                            }}
+                                                        >
+                                                            👁 Voir les détails
+                                                        </button>
 
-                {hasPermission("depots.delete") && (
-                    <button
-                        type="button"
-                        className="actions-menu-item delete"
-                        onClick={() => {
-                            demanderSuppression(depot);
-                            setOpenMenuId(null);
-                        }}
-                    >
-                        🗑 Supprimer
-                    </button>
-                )}
-            </div>
-        )}
-    </div>
-</td>
+                                                        {hasPermission("depots.sceller") &&
+                                                            (depot.scelle ||
+                                                                (depot.statut ||
+                                                                    "PRÉSENT") ===
+                                                                    "PRÉSENT") && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="actions-menu-item seal"
+                                                                    onClick={() => {
+                                                                        changerScelle(
+                                                                            depot,
+                                                                            !depot.scelle
+                                                                        );
+                                                                        setOpenMenuId(null);
+                                                                    }}
+                                                                >
+                                                                    {depot.scelle
+                                                                        ? "🔓 Desceller le corps"
+                                                                        : "🔒 Sceller le corps"}
+                                                                </button>
+                                                            )}
+
+                                                        {!depot.scelle &&
+                                                            (depot.statut ||
+                                                                "PRÉSENT") ===
+                                                                "PRÉSENT" &&
+                                                            hasPermission(
+                                                                "depots.update"
+                                                            ) && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="actions-menu-item box"
+                                                                    onClick={() => {
+                                                                        ouvrirBox(depot);
+                                                                        setOpenMenuId(null);
+                                                                    }}
+                                                                >
+                                                                    📦 Attribuer un box
+                                                                </button>
+                                                            )}
+
+                                                        {!depot.scelle &&
+                                                            hasPermission(
+                                                                "depots.update"
+                                                            ) && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="actions-menu-item edit"
+                                                                    onClick={() => {
+                                                                        editDepot(depot);
+                                                                        setOpenMenuId(null);
+                                                                    }}
+                                                                >
+                                                                    ✏ Modifier
+                                                                </button>
+                                                            )}
+
+                                                        {!depot.scelle &&
+                                                            hasPermission(
+                                                                "depots.delete"
+                                                            ) && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="actions-menu-item delete"
+                                                                    onClick={() => {
+                                                                        demanderSuppression(depot);
+                                                                        setOpenMenuId(null);
+                                                                    }}
+                                                                >
+                                                                    🗑 Supprimer
+                                                                </button>
+                                                            )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))
                             )}
@@ -954,9 +1383,7 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
                 </div>
             </div>
 
-            {/* =====================================================
-                FORMULAIRE
-            ===================================================== */}
+            {/* FORMULAIRE */}
             {showForm && (
                 <div className="modal-overlay">
                     <div className="depot-modal">
@@ -966,7 +1393,6 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
                                     ? "Modifier le dépôt"
                                     : "Nouveau dépôt"}
                             </h2>
-
                             <button
                                 type="button"
                                 className="modal-close"
@@ -976,523 +1402,557 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
                             </button>
                         </div>
 
-                        <form className="depot-form" onSubmit={handleSubmit}>
-                            {/* 01 */}
-                            <div className="form-section">
-                                <div className="section-heading">
-                                    01 — Identification du défunt
-                                </div>
+                        {/* ÉTAPES */}
+                        <div className="wizard-steps">
+                            {ETAPES.map((titre, i) => {
+                                const numero = i + 1;
+                                const etat =
+                                    numero === currentStep
+                                        ? "active"
+                                        : numero < currentStep
+                                        ? "done"
+                                        : "";
+                                return (
+                                    <div
+                                        key={titre}
+                                        className={`wizard-step ${etat}`}
+                                    >
+                                        <span className="wizard-step-number">
+                                            {numero < currentStep
+                                                ? "✓"
+                                                : numero}
+                                        </span>
+                                        <span className="wizard-step-label">
+                                            {titre}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
 
-                                <div className="form-grid">
-                                    <div className="form-group">
-                                        <label>Code du dépôt *</label>
+                        <form
+                            className="depot-form"
+                            onSubmit={handleSubmit}
+                            noValidate
+                        >
+                            {/* ÉTAPE 1 */}
+                            {currentStep === 1 && (
+                                <div className="form-section">
+                                    <div className="section-heading">
+                                        01 — Identification du défunt
+                                    </div>
 
-                                        <div className="code-input">
-                                            <span>{PREFIXE_ANNEE}</span>
-    <input
-        type="text"
-        name="code"
-        value={formData.code}
-                                                onChange={(e) =>
-                                                    setFormData((prev) => ({
-                                                        ...prev,
-                                                        code: e.target.value.replace(
-                                                            /\D/g,
-                                                            ""
-                                                        ),
-                                                    }))
+                                    <div className="form-grid">
+                                        {/* CODE DÉPÔT (26PA00015) — SAISI */}
+                                        <div className="form-group">
+                                            <label>Code du dépôt *</label>
+                                            <div className="code-input">
+                                                <span>{PREFIXE_ANNEE}</span>
+                                                <input
+                                                    type="text"
+                                                    name="code"
+                                                    value={formData.code}
+                                                    onChange={(e) =>
+                                                        setFormData((prev) => ({
+                                                            ...prev,
+                                                            code: e.target.value.replace(
+                                                                /\D/g,
+                                                                ""
+                                                            ),
+                                                        }))
+                                                    }
+                                                    placeholder="00015"
+                                                    maxLength="7"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* CODE DÉFUNT — AUTO, LECTURE SEULE */}
+                                        <div className="form-group">
+                                            <label>Code du défunt</label>
+                                            <input
+                                                type="text"
+                                                name="code_defunt"
+                                                value={
+                                                    formData.code_defunt ||
+                                                    prochainDefuntPreview
                                                 }
-                                                placeholder="00001"
-                                                maxLength="7"
-                                                required
+                                                readOnly
+                                                disabled
+                                                style={{
+                                                    background: "#f4f2f8",
+                                                    cursor: "not-allowed",
+                                                    fontWeight: 700,
+                                                }}
+                                                title="Généré automatiquement (mois + numéro)"
+                                            />
+                                            
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>Nom *</label>
+                                            <input
+                                                type="text"
+                                                name="nom"
+                                                value={formData.nom}
+                                                onChange={handleChange}
+                                            />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>Prénom</label>
+                                            <input
+                                                type="text"
+                                                name="prenom"
+                                                value={formData.prenom}
+                                                onChange={handleChange}
+                                            />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>Sexe *</label>
+                                            <select
+                                                name="sexe"
+                                                value={formData.sexe}
+                                                onChange={handleChange}
+                                            >
+                                                <option value="">Sélectionner</option>
+                                                <option value="Masculin">Masculin</option>
+                                                <option value="Féminin">Féminin</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>Profession</label>
+                                            <div className="profession-container">
+                                                <input
+                                                    type="text"
+                                                    value={professionRecherchee}
+                                                    onChange={(e) => {
+                                                        const valeur = e.target.value;
+                                                        setProfessionRecherchee(valeur);
+                                                        setFormData((prev) => ({
+                                                            ...prev,
+                                                            profession: valeur,
+                                                        }));
+                                                        setAfficherProfessions(true);
+                                                        chargerProfessions(valeur);
+                                                    }}
+                                                    onFocus={() => {
+                                                        setAfficherProfessions(true);
+                                                        chargerProfessions(professionRecherchee);
+                                                    }}
+                                                    autoComplete="off"
+                                                    placeholder="Rechercher..."
+                                                />
+                                                {afficherProfessions && (
+                                                    <div className="profession-suggestions">
+                                                        {professions.map((p) => (
+                                                            <button
+                                                                type="button"
+                                                                key={p.id}
+                                                                className="profession-option"
+                                                                onClick={() =>
+                                                                    selectionnerProfession(p)
+                                                                }
+                                                            >
+                                                                {p.nom}
+                                                            </button>
+                                                        ))}
+                                                        {professionRecherchee.trim() && (
+                                                            <button
+                                                                type="button"
+                                                                className="profession-ajouter"
+                                                                onClick={ajouterProfession}
+                                                            >
+                                                                Ajouter «{" "}
+                                                                {professionRecherchee.trim()}
+                                                                »
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* DATE NAISSANCE */}
+                                        <div className="form-group">
+                                            <label>Date de naissance</label>
+                                            <input
+                                                type="date"
+                                                name="date_naissance"
+                                                value={formData.date_naissance}
+                                                max={maxDate}
+                                                onChange={handleChange}
+                                            />
+                                            <small
+                                                style={{
+                                                    color: "#8b8194",
+                                                    fontSize: 11,
+                                                    marginTop: 4,
+                                                    display: "block",
+                                                }}
+                                            >
+                                                Remplie automatiquement
+                                                lorsque l'âge est saisi
+                                            </small>
+                                        </div>
+
+                                        {/* ÂGE → recalcule la date */}
+                                        <div className="form-group">
+                                            <label>Âge</label>
+                                            <input
+                                                type="number"
+                                                name="age"
+                                                value={formData.age}
+                                                onChange={handleChange}
+                                                min="0"
+                                                max="150"
                                             />
                                         </div>
                                     </div>
+                                </div>
+                            )}
 
-                                    <div className="form-group">
-                                        <label>Code du défunt</label>
-                                        <input
-                                            type="text"
-                                            name="code_defunt"
-                                            value={formData.code_defunt}
-                                            onChange={handleChange}
-                                        />
+                            {/* ÉTAPE 2 */}
+                            {currentStep === 2 && (
+                                <div className="form-section">
+                                    <div className="section-heading">
+                                        02 — Décès et arrivée
                                     </div>
 
-                                    <div className="form-group">
-                                        <label>Nom *</label>
-                                        <input
-                                            type="text"
-                                            name="nom"
-                                            value={formData.nom}
-                                            onChange={handleChange}
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label>Prénom</label>
-                                        <input
-                                            type="text"
-                                            name="prenom"
-                                            value={formData.prenom}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label>Sexe *</label>
-                                        <select
-                                            name="sexe"
-                                            value={formData.sexe}
-                                            onChange={handleChange}
-                                            required
-                                        >
-                                            <option value="">
-                                                Sélectionner
-                                            </option>
-                                            <option value="Masculin">
-                                                Masculin
-                                            </option>
-                                            <option value="Féminin">
-                                                Féminin
-                                            </option>
-                                        </select>
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label>Profession</label>
-
-                                        <div className="profession-container">
+                                    <div className="form-grid">
+                                        <div className="form-group">
+                                            <label>Date du décès *</label>
                                             <input
-                                                type="text"
-                                                value={professionRecherchee}
-                                                onChange={(e) => {
-                                                    const valeur =
-                                                        e.target.value;
-
-                                                    setProfessionRecherchee(
-                                                        valeur
-                                                    );
-
-                                                    setFormData((prev) => ({
-                                                        ...prev,
-                                                        profession: valeur,
-                                                    }));
-
-                                                    setAfficherProfessions(true);
-                                                    chargerProfessions(valeur);
-                                                }}
-                                                onFocus={() => {
-                                                    setAfficherProfessions(
-                                                        true
-                                                    );
-                                                    chargerProfessions(
-                                                        professionRecherchee
-                                                    );
-                                                }}
-                                                autoComplete="off"
-                                                placeholder="Rechercher..."
+                                                type="date"
+                                                name="date_deces"
+                                                value={formData.date_deces}
+                                                max={maxDate}
+                                                onChange={handleChange}
                                             />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Heure du décès</label>
+                                            <input
+                                                type="time"
+                                                name="heure_deces"
+                                                value={formData.heure_deces}
+                                                onChange={handleChange}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Date d'arrivée *</label>
+                                            <input
+                                                type="date"
+                                                name="date_arrivee"
+                                                value={formData.date_arrivee}
+                                                onChange={handleChange}
+                                                min={formData.date_deces || undefined}
+                                                max={maxDate}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Heure d'arrivée</label>
+                                            <input
+                                                type="time"
+                                                name="heure_arrivee"
+                                                value={formData.heure_arrivee}
+                                                onChange={handleChange}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Date de sortie prévue</label>
+                                            <input
+                                                type="date"
+                                                name="date_sortie"
+                                                value={formData.date_sortie}
+                                                onChange={handleChange}
+                                                min={minDate}
+                                                max="2099-12-31"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Motif</label>
+                                            <select
+                                                name="motif"
+                                                value={formData.motif}
+                                                onChange={handleChange}
+                                            >
+                                                <option value="">Sélectionner</option>
+                                                <option value="Conservation">Conservation</option>
+                                                <option value="Préparation">Préparation</option>
+                                                <option value="Transfert">Transfert</option>
+                                                <option value="Autre">Autre</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
-                                            {afficherProfessions && (
-                                                <div className="profession-suggestions">
-                                                    {professions.map(
-                                                        (profession) => (
-                                                            <button
-                                                                type="button"
-                                                                key={
-                                                                    profession.id
-                                                                }
-                                                                className="profession-option"
-                                                                onClick={() =>
-                                                                    selectionnerProfession(
-                                                                        profession
-                                                                    )
-                                                                }
-                                                            >
-                                                                {profession.nom}
-                                                            </button>
-                                                        )
-                                                    )}
+                            {/* ÉTAPE 3 */}
+                            {currentStep === 3 && (
+                                <div className="form-section">
+                                    <div className="section-heading">
+                                        03 — Provenance et emplacement
+                                    </div>
 
-                                                    {professionRecherchee.trim() && (
-                                                        <div
-                                                            className="profession-ajouter"
-                                                            onClick={
-                                                                ajouterProfession
-                                                            }
-                                                        >
-                                                            Ajouter "
-                                                            {professionRecherchee}
-                                                            "
+                                    <div className="form-grid">
+                                        <div className="form-group">
+                                            <label>Provenance *</label>
+                                            <select
+                                                name="provenance"
+                                                value={formData.provenance}
+                                                onChange={handleChange}
+                                            >
+                                                <option value="">Sélectionner</option>
+                                                <option value="Interne">Interne</option>
+                                                <option value="Externe">Externe</option>
+                                            </select>
+                                        </div>
+
+                                        {formData.provenance === "Interne" && (
+                                            <div className="form-group">
+                                                <label>Service d'origine *</label>
+                                                <div className="profession-container">
+                                                    <input
+                                                        type="text"
+                                                        name="service_origine"
+                                                        value={serviceRecherche}
+                                                        onChange={(e) => {
+                                                            const valeur = e.target.value;
+                                                            setServiceRecherche(valeur);
+                                                            setFormData((prev) => ({
+                                                                ...prev,
+                                                                service_origine: valeur,
+                                                            }));
+                                                            setAfficherServices(true);
+                                                            chargerServices(valeur);
+                                                        }}
+                                                        onFocus={() => {
+                                                            setAfficherServices(true);
+                                                            chargerServices(serviceRecherche);
+                                                        }}
+                                                        autoComplete="off"
+                                                        placeholder="Rechercher ou saisir un service..."
+                                                    />
+                                                    {afficherServices && (
+                                                        <div className="profession-suggestions">
+                                                            {services.map((s) => (
+                                                                <button
+                                                                    type="button"
+                                                                    key={s.id}
+                                                                    className="profession-option"
+                                                                    onClick={() =>
+                                                                        selectionnerService(s)
+                                                                    }
+                                                                >
+                                                                    {s.nom}
+                                                                </button>
+                                                            ))}
+                                                            {serviceRecherche.trim() && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="profession-ajouter"
+                                                                    onClick={ajouterService}
+                                                                >
+                                                                    Ajouter «{" "}
+                                                                    {serviceRecherche.trim()}
+                                                                    »
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
-                                            )}
+                                            </div>
+                                        )}
+
+                                        {formData.provenance === "Externe" && (
+                                            <div className="form-group">
+                                                <label>Lieu de provenance *</label>
+                                                <input
+                                                    type="text"
+                                                    name="lieu_provenance"
+                                                    value={formData.lieu_provenance}
+                                                    onChange={handleChange}
+                                                />
+                                            </div>
+                                        )}
+
+                                        <div className="form-group">
+                                            <label>État du corps *</label>
+                                            <select
+                                                name="etat"
+                                                value={formData.etat}
+                                                onChange={handleChange}
+                                            >
+                                                <option value="">Sélectionner</option>
+                                                <option value="Bon état">Bon état</option>
+                                                <option value="État moyen">État moyen</option>
+                                                <option value="Dégradé">Dégradé</option>
+                                                <option value="Altéré">Altéré</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>Emplacement *</label>
+                                            <select
+                                                name="emplacement"
+                                                value={formData.emplacement}
+                                                onChange={handleChange}
+                                            >
+                                                <option value="">Sélectionner</option>
+                                                <option value="Chambre froide individuelle">
+                                                    Chambre froide individuelle
+                                                </option>
+                                                <option value="Chambre froide commune">
+                                                    Chambre froide commune
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>Chapelle</label>
+                                            <select
+                                                name="chapelle"
+                                                value={formData.chapelle}
+                                                onChange={handleChange}
+                                            >
+                                                <option value="">Aucune</option>
+                                                <option value="Petite chapelle">Petite chapelle</option>
+                                                <option value="Grande chapelle">Grande chapelle</option>
+                                            </select>
                                         </div>
                                     </div>
-
-                                    <div className="form-group">
-                                        <label>Date de naissance</label>
-                                        <input
-                                            type="date"
-                                            name="date_naissance"
-                                            value={formData.date_naissance}
-                                            max={maxDate}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label>Âge</label>
-                                        <input
-                                            type="number"
-                                            name="age"
-                                            value={formData.age}
-                                            disabled={Boolean(
-                                                formData.date_naissance
-                                            )}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
                                 </div>
-                            </div>
+                            )}
 
-                            {/* 02 */}
-                            <div className="form-section">
-                                <div className="section-heading">
-                                    02 — Décès et arrivée
-                                </div>
-
-                                <div className="form-grid">
-                                    <div className="form-group">
-                                        <label>Date du décès *</label>
-                                        <input
-                                            type="date"
-                                            name="date_deces"
-                                            value={formData.date_deces}
-                                            max={maxDate}
-                                            onChange={handleChange}
-                                            required
-                                        />
+                            {/* ÉTAPE 4 */}
+                            {currentStep === 4 && (
+                                <div className="form-section">
+                                    <div className="section-heading">
+                                        04 — Déposants et contacts
                                     </div>
 
-                                    <div className="form-group">
-                                        <label>Heure du décès</label>
-                                        <input
-                                            type="time"
-                                            name="heure_deces"
-                                            value={formData.heure_deces}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
+                                    {deposants.length > 0 && (
+                                        <div className="deposants-list">
+                                            {deposants.map((d, index) => (
+                                                <div
+                                                    key={index}
+                                                    className={`deposant-card ${d.statut}`}
+                                                >
+                                                    <div className="deposant-card-info">
+                                                        <strong>{d.nom}</strong>
+                                                        <span>
+                                                            {d.telephone || "Téléphone non renseigné"}
+                                                            {d.cni ? ` • CNI : ${d.cni}` : ""}
+                                                            {d.lien_parente ? ` • ${d.lien_parente}` : ""}
+                                                        </span>
+                                                    </div>
 
-                                    <div className="form-group">
-                                        <label>Date d'arrivée *</label>
-                                        <input
-                                            type="date"
-                                            name="date_arrivee"
-                                            value={formData.date_arrivee}
-                                            onChange={handleChange}
-                                            min={
-                                                formData.date_deces ||
-                                                undefined
-                                            }
-                                            max={maxDate}
-                                            required
-                                        />
-                                    </div>
+                                                    <label className="deposant-radio">
+                                                        <input
+                                                            type="radio"
+                                                            name="deposant_principal"
+                                                            checked={d.statut === "principal"}
+                                                            onChange={() => definirPrincipal(index)}
+                                                        />
+                                                        Déposant principal
+                                                    </label>
 
-                                    <div className="form-group">
-                                        <label>Heure d'arrivée</label>
-                                        <input
-                                            type="time"
-                                            name="heure_arrivee"
-                                            value={formData.heure_arrivee}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
+                                                    <span className={`deposant-badge ${d.statut}`}>
+                                                        {d.statut === "principal"
+                                                            ? "PRINCIPAL"
+                                                            : "SECONDAIRE"}
+                                                    </span>
 
-                                    <div className="form-group">
-                                        <label>Date de sortie prévue</label>
-                                        <input
-                                            type="date"
-                                            name="date_sortie"
-                                            value={formData.date_sortie}
-                                            onChange={handleChange}
-                                            min={minDate}
-                                            max="2099-12-31"
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label>Motif</label>
-                                        <select
-                                            name="motif"
-                                            value={formData.motif}
-                                            onChange={handleChange}
-                                        >
-                                            <option value="">
-                                                Sélectionner
-                                            </option>
-                                            <option value="Décès">
-                                                Décès
-                                            </option>
-                                            <option value="Conservation">
-                                                Conservation
-                                            </option>
-                                            <option value="Préparation">
-                                                Préparation
-                                            </option>
-                                            <option value="Transfert">
-                                                Transfert
-                                            </option>
-                                            <option value="Autre">Autre</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 03 */}
-                            <div className="form-section">
-                                <div className="section-heading">
-                                    03 — Provenance et emplacement
-                                </div>
-
-                                <div className="form-grid">
-                                    <div className="form-group">
-                                        <label>Provenance *</label>
-                                        <select
-                                            name="provenance"
-                                            value={formData.provenance}
-                                            onChange={handleChange}
-                                            required
-                                        >
-                                            <option value="">
-                                                Sélectionner
-                                            </option>
-                                            <option value="Interne">
-                                                Interne
-                                            </option>
-                                            <option value="Externe">
-                                                Externe
-                                            </option>
-                                        </select>
-                                    </div>
-
-
-
-                                   {formData.provenance === "Interne" && (
-    <div className="form-group">
-        <label>Service d'origine *</label>
-
-        <div className="profession-container">
-            <input
-                type="text"
-                name="service_origine"
-                value={serviceRecherche}
-                onChange={(e) => {
-                    const valeur = e.target.value;
-
-                    setServiceRecherche(valeur);
-
-                    setFormData((prev) => ({
-                        ...prev,
-                        service_origine: valeur,
-                    }));
-
-                    setAfficherServices(true);
-                    chargerServices(valeur);
-                }}
-                onFocus={() => {
-                    setAfficherServices(true);
-                    chargerServices(serviceRecherche);
-                }}
-                autoComplete="off"
-                placeholder="Rechercher ou saisir un service..."
-                required
-            />
-
-            {afficherServices && (
-                <div className="profession-suggestions">
-                    {services.map((service) => (
-                        <button
-                            type="button"
-                            key={service.id}
-                            className="profession-option"
-                            onClick={() =>
-                                selectionnerService(service)
-                            }
-                        >
-                            {service.nom}
-                        </button>
-                    ))}
-
-                    {serviceRecherche.trim() && (
-                        <button
-                            type="button"
-                            className="profession-ajouter"
-                            onClick={ajouterService}
-                        >
-                            Ajouter « {serviceRecherche.trim()} »
-                        </button>
-                    )}
-                </div>
-            )}
-        </div>
-    </div>
-)}
-                                    {formData.provenance === "Externe" && (
-                                        <div className="form-group">
-                                            <label>
-                                                Lieu de provenance *
-                                            </label>
-                                            <input
-                                                type="text"
-                                                name="lieu_provenance"
-                                                value={
-                                                    formData.lieu_provenance
-                                                }
-                                                onChange={handleChange}
-                                                required
-                                            />
+                                                    <div className="deposant-card-actions">
+                                                        <button
+                                                            type="button"
+                                                            className="deposant-btn"
+                                                            onClick={() => corrigerDeposant(index)}
+                                                        >
+                                                            ✏
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="deposant-btn danger"
+                                                            onClick={() => retirerDeposant(index)}
+                                                        >
+                                                            🗑
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     )}
 
-                                    <div className="form-group">
-                                        <label>État du corps *</label>
-                                        <select
-                                            name="etat"
-                                            value={formData.etat}
-                                            onChange={handleChange}
-                                            required
-                                        >
-                                            <option value="">
-                                                Sélectionner
-                                            </option>
-                                            <option value="Bon état">
-                                                Bon état
-                                            </option>
-                                            <option value="État moyen">
-                                                État moyen
-                                            </option>
-                                            <option value="Dégradé">
-                                                Dégradé
-                                            </option>
-                                            <option value="Altéré">
-                                                Altéré
-                                            </option>
-                                        </select>
+                                    <div className="deposant-subtitle">
+                                        {deposants.length === 0
+                                            ? "Déposant principal"
+                                            : `Déposant n° ${deposants.length + 1} (secondaire)`}
                                     </div>
 
-                                    <div className="form-group">
-                                        <label>Emplacement *</label>
-                                        <select
-                                            name="emplacement"
-                                            value={formData.emplacement}
-                                            onChange={handleChange}
-                                            required
-                                        >
-                                            <option value="">
-                                                Sélectionner
-                                            </option>
-                                            <option value="Chambre froide individuelle">
-                                                Chambre froide individuelle
-                                            </option>
-                                            <option value="Chambre froide commune">
-                                                Chambre froide commune
-                                            </option>
-                                        </select>
+                                    <div className="form-grid">
+                                        <div className="form-group">
+                                            <label>Nom du déposant *</label>
+                                            <input
+                                                type="text"
+                                                name="nom"
+                                                value={deposantCourant.nom}
+                                                onChange={handleDeposantChange}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Téléphone</label>
+                                            <input
+                                                type="tel"
+                                                name="telephone"
+                                                value={deposantCourant.telephone}
+                                                onChange={handleDeposantChange}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>CNI du déposant</label>
+                                            <input
+                                                type="text"
+                                                name="cni"
+                                                value={deposantCourant.cni}
+                                                onChange={handleDeposantChange}
+                                                placeholder="Numéro CNI"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Lien de parenté</label>
+                                            <select
+                                                name="lien_parente"
+                                                value={deposantCourant.lien_parente}
+                                                onChange={handleDeposantChange}
+                                            >
+                                                <option value="">Sélectionner</option>
+                                                <option value="Père">Père</option>
+                                                <option value="Mère">Mère</option>
+                                                <option value="Époux(se)">Époux(se)</option>
+                                                <option value="Fils">Fils</option>
+                                                <option value="Fille">Fille</option>
+                                                <option value="Frère">Frère</option>
+                                                <option value="Sœur">Sœur</option>
+                                                <option value="Oncle">Oncle</option>
+                                                <option value="Tante">Tante</option>
+                                                <option value="Autre">Autre</option>
+                                            </select>
+                                        </div>
                                     </div>
 
-                                    <div className="form-group">
-                                        <label>Chapelle</label>
-                                        <select
-                                            name="chapelle"
-                                            value={formData.chapelle}
-                                            onChange={handleChange}
-                                        >
-                                            <option value="">Aucune</option>
-                                            <option value="Petite chapelle">
-                                                Petite chapelle
-                                            </option>
-                                            <option value="Grande chapelle">
-                                                Grande chapelle
-                                            </option>
-                                        </select>
-                                    </div>
+                                    <button
+                                        type="button"
+                                        className="button-add-deposant"
+                                        onClick={ajouterDeposant}
+                                    >
+                                         Ajouter ce déposant
+                                    </button>
                                 </div>
-                            </div>
-
-                            {/* 04 */}
-                            <div className="form-section">
-                                <div className="section-heading">
-                                    04 — Déposant et contact
-                                </div>
-
-                                <div className="form-grid">
-                                    <div className="form-group">
-                                        <label>Nom du déposant *</label>
-                                        <input
-                                            type="text"
-                                            name="contact_nom"
-                                            value={formData.contact_nom}
-                                            onChange={handleChange}
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label>Téléphone</label>
-                                        <input
-                                            type="tel"
-                                            name="contact_telephone"
-                                            value={formData.contact_telephone}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-    <label>CNI du déposant</label>
-    <input
-        type="text"
-        name="contact_cni"
-        value={formData.contact_cni}
-        onChange={handleChange}
-        placeholder="Numéro CNI"
-        required
-    />
-</div>
-
-                                    <div className="form-group">
-                                        <label>Lien de parenté</label>
-                                        <select
-                                            name="lien_parente"
-                                            value={formData.lien_parente}
-                                            onChange={handleChange}
-                                        >
-                                            <option value="">
-                                                Sélectionner
-                                            </option>
-                                            <option value="Père">Père</option>
-                                            <option value="Mère">Mère</option>
-                                            <option value="Époux(se)">
-                                                Époux(se)
-                                            </option>
-                                            <option value="Fils">Fils</option>
-                                            <option value="Fille">Fille</option>
-                                            <option value="Frère">Frère</option>
-                                            <option value="Sœur">Sœur</option>
-                                            <option value="Oncle">Oncle</option>
-                                            <option value="Tante">Tante</option>
-                                            <option value="Autre">Autre</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                                 
+                            )}
 
                             {/* BOUTONS */}
                             <div className="form-buttons">
@@ -1504,13 +1964,85 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
                                     Annuler
                                 </button>
 
+                                {currentStep > 1 && (
+                                    <button
+                                        type="button"
+                                        className="button-cancel"
+                                        onClick={etapePrecedente}
+                                    >
+                                        ← Précédent
+                                    </button>
+                                )}
+
+                                {currentStep < ETAPES.length ? (
+                                    <button
+                                        key="btn-suivant"
+                                        type="button"
+                                        className="button-save"
+                                        onClick={etapeSuivante}
+                                    >
+                                        Suivant →
+                                    </button>
+                                ) : (
+                                    <button
+                                        key="btn-enregistrer"
+                                        type="submit"
+                                        className="button-save"
+                                    >
+                                        {editingId
+                                            ? "Enregistrer les modifications"
+                                            : "Enregistrer le dépôt"}
+                                    </button>
+                                )}
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* BOX */}
+            {boxOpen && boxDepot && (
+                <div className="modal-overlay">
+                    <div className="box-modal">
+                        <div className="modal-header">
+                            <h2>Attribuer un box</h2>
+                            <button
+                                type="button"
+                                className="modal-close"
+                                onClick={fermerBox}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <form className="box-modal-body" onSubmit={enregistrerBox}>
+                            <p className="box-modal-info">
+                                {boxDepot.nom} {boxDepot.prenom} — {boxDepot.code}
+                            </p>
+                            <div className="form-group">
+                                <label>Nom du box *</label>
+                                <input
+                                    type="text"
+                                    value={boxName}
+                                    onChange={(e) => setBoxName(e.target.value)}
+                                    placeholder="Ex : E1"
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="form-buttons">
+                                <button
+                                    type="button"
+                                    className="button-cancel"
+                                    onClick={fermerBox}
+                                    disabled={boxLoading}
+                                >
+                                    Annuler
+                                </button>
                                 <button
                                     type="submit"
                                     className="button-save"
+                                    disabled={boxLoading}
                                 >
-                                    {editingId
-                                        ? "Enregistrer les modifications"
-                                        : "Enregistrer le dépôt"}
+                                    {boxLoading ? "Enregistrement..." : "Enregistrer"}
                                 </button>
                             </div>
                         </form>
@@ -1518,15 +2050,12 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
                 </div>
             )}
 
-            {/* =====================================================
-                DETAILS
-            ===================================================== */}
+            {/* DETAILS */}
             {showDetails && selectedDepot && (
                 <div className="modal-overlay">
                     <div className="details-modal">
                         <div className="details-header">
                             <h2>Détails du dépôt</h2>
-
                             <button
                                 type="button"
                                 className="modal-close"
@@ -1542,112 +2071,210 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
                         <div className="details-content">
                             <div className="details-person">
                                 <div className="person-avatar">👤</div>
-
                                 <div>
                                     <h3>
-                                        {selectedDepot.nom}{" "}
-                                        {selectedDepot.prenom}
+                                        {selectedDepot.nom} {selectedDepot.prenom}
                                     </h3>
                                     <p>Code : {selectedDepot.code}</p>
+                                    <p>
+                                        Code défunt :{" "}
+                                        {selectedDepot.code_defunt || "-"}
+                                    </p>
                                 </div>
                             </div>
 
                             <div className="details-grid">
                                 <div className="detail-item">
                                     <label>Profession</label>
-                                    <span>
-                                        {selectedDepot.profession || "-"}
-                                    </span>
+                                    <span>{selectedDepot.profession || "-"}</span>
                                 </div>
-
                                 <div className="detail-item">
                                     <label>Âge</label>
                                     <span>{selectedDepot.age || "-"}</span>
                                 </div>
-
                                 <div className="detail-item">
                                     <label>Date décès</label>
                                     <span>
                                         {selectedDepot.date_deces
-                                            ? formatDateForInput(
-                                                  selectedDepot.date_deces
-                                              )
+                                            ? formatDateForInput(selectedDepot.date_deces)
                                             : "-"}
                                     </span>
                                 </div>
-
                                 <div className="detail-item">
                                     <label>Provenance</label>
-                                    <span>
-                                        {selectedDepot.provenance || "-"}
-                                    </span>
+                                    <span>{selectedDepot.provenance || "-"}</span>
                                 </div>
-
                                 <div className="detail-item">
                                     <label>Emplacement</label>
-                                    <span>
-                                        {selectedDepot.emplacement || "-"}
-                                    </span>
+                                    <span>{selectedDepot.emplacement || "-"}</span>
                                 </div>
-
+                                <div className="detail-item">
+                                    <label>Box attribué</label>
+                                    <span>{selectedDepot.box_name || "-"}</span>
+                                </div>
                                 <div className="detail-item">
                                     <label>Chapelle</label>
-                                    <span>
-                                        {selectedDepot.chapelle || "-"}
-                                    </span>
+                                    <span>{selectedDepot.chapelle || "-"}</span>
                                 </div>
-
                                 <div className="detail-item">
-                                    <label>Déposant</label>
+                                    <label>Scellé</label>
                                     <span>
-                                        {selectedDepot.contact_nom || "-"}
+                                        {selectedDepot.scelle
+                                            ? `🔒 Oui, par ${
+                                                  selectedDepot.scelleur?.name || "-"
+                                              }${
+                                                  selectedDepot.scelle_le
+                                                      ? " le " +
+                                                        new Date(
+                                                            selectedDepot.scelle_le
+                                                        ).toLocaleString("fr-FR")
+                                                      : ""
+                                              }`
+                                            : "Non"}
                                     </span>
                                 </div>
-
-                                <div className="detail-item">
-                                    <label>Téléphone</label>
-                                    <span>
-                                        {selectedDepot.contact_telephone ||
-                                            "-"}
-                                    </span>
-                                </div>
-                                
                             </div>
 
-                            <div className="details-actions">
-                                {hasPermission("depots.update") && (
-                                    <button
-                                        type="button"
-                                        className="button-cancel"
-                                        onClick={() => {
-                                            setShowDetails(false);
-                                            editDepot(selectedDepot);
-                                        }}
-                                    >
-                                        ✏ Modifier
-                                    </button>
-                                )}
+                            <div className="details-deposants">
+                                <h4>
+                                    Déposants (
+                                    {getDeposantsDepot(selectedDepot).length})
+                                </h4>
 
-                                {hasPermission("depots.delete") && (
-                                    <button
-                                        type="button"
-                                        className="details-delete"
-                                        onClick={() =>
-                                            demanderSuppression(selectedDepot)
-                                        }
-                                    >
-                                        🗑 Supprimer
-                                    </button>
+                                {getDeposantsDepot(selectedDepot).length === 0 ? (
+                                    <p className="details-deposants-vide">
+                                        Aucun déposant enregistré.
+                                    </p>
+                                ) : (
+                                    getDeposantsDepot(selectedDepot)
+                                        .slice()
+                                        .sort((a, b) =>
+                                            a.statut === "principal"
+                                                ? -1
+                                                : b.statut === "principal"
+                                                ? 1
+                                                : 0
+                                        )
+                                        .map((d, index) => (
+                                            <div
+                                                key={d.id || index}
+                                                className={`details-deposant-card ${
+                                                    d.statut === "principal"
+                                                        ? "principal"
+                                                        : "secondaire"
+                                                }`}
+                                            >
+                                                <div className="details-deposant-top">
+                                                    <strong>{d.nom || "-"}</strong>
+                                                    <span
+                                                        className={`deposant-badge ${
+                                                            d.statut === "principal"
+                                                                ? "principal"
+                                                                : "secondaire"
+                                                        }`}
+                                                    >
+                                                        {d.statut === "principal"
+                                                            ? "PRINCIPAL"
+                                                            : "SECONDAIRE"}
+                                                    </span>
+                                                </div>
+                                                <div className="details-deposant-line">
+                                                    <label>Téléphone</label>
+                                                    <span>{d.telephone || "-"}</span>
+                                                </div>
+                                                <div className="details-deposant-line">
+                                                    <label>CNI</label>
+                                                    <span>{d.cni || "-"}</span>
+                                                </div>
+                                                <div className="details-deposant-line">
+                                                    <label>Lien de parenté</label>
+                                                    <span>{d.lien_parente || "-"}</span>
+                                                </div>
+                                            </div>
+                                        ))
                                 )}
+                            </div>
+
+                            <label className="enregistre">Enregistré par : </label>
+                            <span className="enregistre">
+                                {getNomEnregistreur(selectedDepot)}
+                            </span>
+                            <span className="day">
+                                {selectedDepot.created_at
+                                    ? new Date(
+                                          selectedDepot.created_at
+                                      ).toLocaleString("fr-FR")
+                                    : "-"}
+                            </span>
+                            <br />
+                            <label className="enregistre">
+                                Dernière modification par :{" "}
+                            </label>
+                            <span className="enregistre">
+                                {selectedDepot?.modificateur?.name || "-"}
+                            </span>
+                            <span className="days">
+                                {selectedDepot.updated_at
+                                    ? new Date(
+                                          selectedDepot.updated_at
+                                      ).toLocaleString("fr-FR")
+                                    : "-"}
+                            </span>
+
+                            <div className="details-actions">
+                                {hasPermission("depots.sceller") &&
+                                    (selectedDepot.scelle ||
+                                        (selectedDepot.statut || "PRÉSENT") ===
+                                            "PRÉSENT") && (
+                                        <button
+                                            type="button"
+                                            className="button-cancel"
+                                            onClick={() =>
+                                                changerScelle(
+                                                    selectedDepot,
+                                                    !selectedDepot.scelle
+                                                )
+                                            }
+                                        >
+                                            {selectedDepot.scelle
+                                                ? "🔓 Desceller"
+                                                : "🔒 Sceller"}
+                                        </button>
+                                    )}
+
+                                {!selectedDepot.scelle &&
+                                    hasPermission("depots.update") && (
+                                        <button
+                                            type="button"
+                                            className="button-cancel"
+                                            onClick={() => {
+                                                setShowDetails(false);
+                                                editDepot(selectedDepot);
+                                            }}
+                                        >
+                                            ✏ Modifier
+                                        </button>
+                                    )}
+
+                                {!selectedDepot.scelle &&
+                                    hasPermission("depots.delete") && (
+                                        <button
+                                            type="button"
+                                            className="details-delete"
+                                            onClick={() =>
+                                                demanderSuppression(selectedDepot)
+                                            }
+                                        >
+                                            🗑 Supprimer
+                                        </button>
+                                    )}
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* =====================================================
-                CONFIRMATION
-            ===================================================== */}
+            {/* CONFIRMATION */}
             <ConfirmDialog
                 open={confirmOpen}
                 title={confirmConfig.title}
@@ -1660,9 +2287,7 @@ code: `${PREFIXE_ANNEE}${formData.code}`,
                 onCancel={closeConfirm}
             />
 
-            {/* =====================================================
-                NOTIFICATION
-            ===================================================== */}
+            {/* NOTIFICATION */}
             <NotificationBox
                 open={notif.open}
                 type={notif.type}

@@ -18,7 +18,7 @@ use App\Http\Controllers\CorbeilleController;
 use App\Http\Controllers\HistoriqueController;
 use App\Http\Controllers\DeclarationDecesController;
 use App\Http\Controllers\ServiceController;
-
+use App\Http\Controllers\CertificatGenreMortController;
 /*
 |--------------------------------------------------------------------------
 | API REST
@@ -58,10 +58,15 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/depots', [DepotController::class, 'index']);
         Route::get('/depots-disponibles', [DepotController::class, 'corpsDisponibles']);
         Route::get('/depots/{id}', [DepotController::class, 'show']);
+
     });
     Route::post('/depots', [DepotController::class, 'store'])->middleware('permission:depots.create');
     Route::put('/depots/{id}', [DepotController::class, 'update'])->middleware('permission:depots.update');
+    Route::put('/depots/{id}/box', [DepotController::class, 'assignBox']);
     Route::delete('/depots/{id}', [DepotController::class, 'destroy'])->middleware('permission:depots.delete');
+
+    Route::put('/depots/{id}/sceller', [DepotController::class, 'sceller'])->middleware('permission:depots.sceller');
+Route::put('/depots/{id}/desceller', [DepotController::class, 'desceller'])->middleware('permission:depots.sceller');
 
     /* ---------- SORTIES ---------- */
     Route::middleware('permission:sorties.view')->group(function () {
@@ -136,4 +141,16 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     /* ---------- CORBEILLE (consultation uniquement, non vidable) ---------- */
     Route::get('/corbeille', [CorbeilleController::class, 'index'])->middleware('permission:corbeille.view');
     Route::get('/corbeille/{id}', [CorbeilleController::class, 'show'])->middleware('permission:corbeille.view');
+
+// Certificat de genre de mort
+Route::get('/certificats-genre-mort/noms', [CertificatGenreMortController::class, 'noms']);
+
+Route::post('/certificats-genre-mort/noms', [CertificatGenreMortController::class, 'ajouterNom']);
+
+Route::get('/certificats-genre-mort/depot/{depotId}', [CertificatGenreMortController::class,'show']);
+
+Route::post('/certificats-genre-mort', [CertificatGenreMortController::class, 'store']);
+
+Route::put('/certificats-genre-mort/{id}', [CertificatGenreMortController::class,'update']);
+
 });

@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -13,12 +14,18 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
 
-        $middleware->alias([
-            'permission' => \App\Http\Middleware\EnsurePermission::class,
-            'active' => \App\Http\Middleware\EnsureUserIsActive::class,
-        ]);
+    $middleware->alias([
+        'permission' => \App\Http\Middleware\EnsurePermission::class,
+        'active' => \App\Http\Middleware\EnsureUserIsActive::class,
+    ]);
 
-    })
+    // Ne pas rediriger les requêtes API vers une page de connexion
+    $middleware->redirectGuestsTo(
+        fn (Request $request) =>
+            $request->is('api/*') ? null : route('login')
+    );
+
+})
     ->withExceptions(function (Exceptions $exceptions): void {
         // Les erreurs de l'API sont toujours renvoyées en JSON
         $exceptions->shouldRenderJsonWhen(

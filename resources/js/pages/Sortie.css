@@ -685,7 +685,7 @@
     margin-bottom: 18px;
     padding-bottom: 12px;
     border-bottom: 1px solid #ece5f3;
-    color: #54209e;
+    color: #f8f8fa;
     font-family: "Poppins", "Inter", sans-serif;
     font-size: 15px;
     font-weight: 800;
@@ -1199,4 +1199,242 @@
     .prestations-grid {
         grid-template-columns: 1fr;
     }
+}
+.alert-danger {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-top: 8px;
+}
+/* =========================================================
+   ALERTE — SORTIES EN RETARD
+========================================================= */
+
+.alert-banner {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    padding: 14px 18px;
+    margin-bottom: 16px;
+
+    border-radius: 14px;
+
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.alert-banner-danger {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #7c2d12;
+}
+
+.alert-banner-icon {
+    width: 40px;
+    height: 40px;
+
+    flex-shrink: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: #ffedd5;
+    color: #c2410c;
+
+    font-size: 22px;
+    font-weight: 800;
+}
+
+.alert-banner-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.alert-banner-body strong {
+    font-size: 15px;
+    color: #7c2d12;
+}
+
+.alert-banner-body span {
+    font-size: 13px;
+    color: #9a3412;
+}
+
+.alert-banner-action {
+    padding: 8px 14px;
+
+    border: 1px solid #fb923c;
+    border-radius: 10px;
+
+    background: #fff;
+    color: #9a3412;
+
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+
+    transition: background 0.15s, transform 0.15s;
+    white-space: nowrap;
+}
+
+.alert-banner-action:hover {
+    background: #ffedd5;
+    transform: translateY(-1px);
+}
+
+/* ---------- Détail dépliable ---------- */
+
+.alert-detail {
+    margin-bottom: 16px;
+
+    padding: 14px 18px;
+
+    background: #ffffff;
+    border: 1px solid #f5d1a8;
+    border-radius: 14px;
+}
+
+.alert-detail-title {
+    margin-bottom: 10px;
+
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #9a3412;
+}
+
+.alert-detail-list {
+    margin: 0;
+    padding: 0;
+
+    list-style: none;
+
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.alert-detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+
+    padding: 10px 12px;
+
+    background: #fffaf5;
+    border: 1px solid #fdebd5;
+    border-radius: 10px;
+}
+
+.alert-detail-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    font-size: 13px;
+    color: #6b4a2b;
+}
+
+.alert-detail-info strong {
+    color: #4a2c12;
+}
+
+.alert-detail-retard {
+    color: #b45309;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.alert-detail-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.btn-warning-small,
+.btn-primary-small,
+.btn-secondary-small {
+    padding: 6px 10px;
+
+    border-radius: 8px;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    border: 1px solid transparent;
+
+    transition: background 0.15s, transform 0.15s;
+}
+
+.btn-warning-small {
+    background: #ffedd5;
+    color: #9a3412;
+    border-color: #fed7aa;
+}
+
+.btn-warning-small:hover {
+    background: #fed7aa;
+}
+
+.btn-primary-small {
+    background: #ecfdf5;
+    color: #047857;
+    border-color: #a7f3d0;
+}
+
+.btn-primary-small:hover {
+    background: #d1fae5;
+}
+
+.btn-secondary-small {
+    background: #f3f4f6;
+    color: #374151;
+    border-color: #e5e7eb;
+}
+
+.btn-secondary-small:hover {
+    background: #e5e7eb;
+}
+
+/* ---------- Surlignage des lignes en retard ---------- */
+
+.sortie-table tbody tr.row-late {
+    background: #fffaf5;
+}
+
+.sortie-table tbody tr.row-late:hover {
+    background: #fff2e5;
+}
+
+.sortie-table tbody tr.row-late td:first-child {
+    border-left: 3px solid #f97316;
+    padding-left: 10px;
+}
+
+.late-badge {
+    display: inline-block;
+    margin-left: 6px;
+
+    padding: 1px 6px;
+
+    background: #ffedd5;
+    color: #c2410c;
+
+    border-radius: 6px;
+
+    font-size: 11px;
+    font-weight: 800;
 }

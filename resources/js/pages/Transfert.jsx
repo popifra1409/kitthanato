@@ -128,7 +128,7 @@ function Transfert() {
         type: "",
         emplacement_destination: "",
         destination: "",
-        statut: "EN ATTENTE",
+        motif: "",
     });
 
     /* =====================================================
@@ -216,9 +216,10 @@ function Transfert() {
     ===================================================== */
 
     const depotsDisponibles = useMemo(() => {
-        return depots.filter((depot) => depotEstPresent(depot));
-    }, [depots]);
-
+    return depots.filter(
+        (depot) => depotEstPresent(depot) && !depot.scelle
+    );
+}, [depots]);
     /* =====================================================
        CHANGEMENT DES CHAMPS
     ===================================================== */
@@ -288,7 +289,7 @@ function Transfert() {
             type: "",
             emplacement_destination: "",
             destination: "",
-            statut: "EN ATTENTE",
+            motif: "",
         });
 
         setShowForm(true);
@@ -356,6 +357,15 @@ function Transfert() {
             return;
         }
 
+        if (depotLie?.scelle) {
+    showNotif(
+        "error",
+        "Corps scellé",
+        "Ce corps est scellé. Son transfert ne peut pas être modifié."
+    );
+    return;
+}
+
         setEditingId(transfert.id);
         setEmplacementInitial(emplacementActuel);
 
@@ -366,7 +376,7 @@ function Transfert() {
             type,
             emplacement_destination: emplacementDestination,
             destination,
-            statut: transfert.statut || "EN ATTENTE",
+            motif: "",
         });
 
         setShowForm(true);
@@ -412,14 +422,14 @@ function Transfert() {
     ===================================================== */
 
     const validateForm = () => {
-        if (!formData.date) {
-            showNotif(
-                "error",
-                "Champ manquant",
-                "Veuillez sélectionner une date."
-            );
-            return false;
-        }
+       if (!String(formData.motif || "").trim()) {
+    showNotif(
+        "error",
+        "Champ manquant",
+        "Veuillez renseigner le motif du transfert."
+    );
+    return false;
+}
 
         const aujourdHui = getDateAujourdhui();
 
@@ -471,6 +481,15 @@ function Transfert() {
             );
             return false;
         }
+
+        if (depot.scelle) {
+    showNotif(
+        "error",
+        "Corps scellé",
+        "Ce corps est scellé. Seul l'administrateur peut le desceller."
+    );
+    return false;
+}
 
         if (!formData.type) {
             showNotif(
@@ -546,7 +565,9 @@ function Transfert() {
                 formData.type === "externe"
                     ? String(formData.destination).trim()
                     : null,
-            statut: formData.statut || "EN ATTENTE",
+
+                    motif: String(formData.motif).trim(),
+                    statut: "EN ATTENTE", 
         };
 
         try {
@@ -625,7 +646,7 @@ function Transfert() {
                 transfert.type || "",
                 provenance,
                 destination,
-                transfert.statut || "",
+                transfert.motif || "",
             ]
                 .join(" ")
                 .toLowerCase();
@@ -1111,19 +1132,19 @@ function Transfert() {
                                 )}
 
                                 {/* STATUT */}
-                                <div className="transfert-input-group">
-                                    <label>STATUT</label>
-                                    <select
-                                        name="statut"
-                                        value={formData.statut || "EN ATTENTE"}
-                                        onChange={handleChange}
-                                    >
-                                        <option value="EN ATTENTE">
-                                            EN ATTENTE
-                                        </option>
-                                        <option value="VALIDÉ">VALIDÉ</option>
-                                    </select>
-                                </div>
+                                {/* MOTIF */}
+<div className="transfert-input-group transfert-input-full">
+    <label>MOTIF DU TRANSFERT</label>
+    <input
+        type="text"
+        name="motif"
+        value={formData.motif || ""}
+        onChange={handleChange}
+        placeholder="Ex : demande de la famille, autopsie, rapatriement..."
+        maxLength="255"
+        required
+    />
+</div>
                             </div>
 
                             {/* BOUTONS */}

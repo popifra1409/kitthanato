@@ -15,6 +15,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Recu from "./pages/Recu";
 import DeclarationDeces from "./pages/DeclarationDeces";
 import { SessionProvider } from "./services/SessionContext";
+import GenreDeMort from "./pages/GenreDeMort";
 
 /* =====================================================
    ROUTES PROTÉGÉES
@@ -30,9 +31,7 @@ const PAGES = [
     { path: "/Sortie", permission: "sorties.view", element: <Sortie /> },
     { path: "/Statistiques", permission: "statistiques.view", element: <Statistiques /> },
     { path: "/declarations", permission: "declarations.view", element: <DashboardDeclaration /> },
-    {
-        path: "/Parametres",
-        permission: [
+    {path: "/Parametres", permission: [
             "utilisateurs.view",
             "roles.view",
             "referentiels.manage",
@@ -41,6 +40,16 @@ const PAGES = [
         ],
         element: <Parametres />,
     },
+{
+  path: "/certificatgenremort",
+  permission: "certificatgenremort.view",
+  element: <GenreDeMort />,
+},
+{
+  path: "/certificatgenremort/:depotId",
+  permission: "certificatgenremort.view",
+  element: <GenreDeMort />,
+},
 ];
 
 function App() {

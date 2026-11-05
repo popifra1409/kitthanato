@@ -203,7 +203,7 @@ body.dark-mode .levees-error {
 .levees-search:focus-within {
     border-color: var(--lv-primary-soft);
     background: var(--lv-surface);
-    box-shadow: 0 0 0 3px rgba(148, 85, 183, 0.1);
+    box-shadow: 0 0 0 3px rgba(136, 129, 228, 0.1);
 }
 
 .levees-search span {
@@ -808,6 +808,7 @@ body.dark-mode .levee-row:hover {
 
 .levee-row.levee-terminee .levee-defunt strong {
     color: #a10e0e;
+    background-color: #a10e0e ;
 }
 
 /* =====================================================

@@ -1,8 +1,11 @@
 *.log
 .DS_Store
 .env
+.env.*
+!.env.example
 .env.backup
 .env.production
+dist/
 .phpactor.json
 .phpunit.result.cache
 /.fleet

@@ -42,6 +42,14 @@ abstract class ApiTestCase extends TestCase
             'chapelle' => 'Aucune',
             'contact_nom' => 'Jane Doe',
             'contact_telephone' => '699000000',
+            'depositants' => [
+                [
+                    'nom' => 'Jane Doe',
+                    'telephone' => '699000000',
+                    'lien_parente' => 'Conjoint',
+                    'statut' => 'principal',
+                ],
+            ],
         ], $surcharges);
     }
 }

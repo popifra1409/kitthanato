@@ -1,4 +1,9 @@
 import { useEffect, useState } from "react";
+import {
+    construireRapport,
+    imprimerRapport,
+    exporterExcel,
+} from "../services/exportStats";
 import "./Statistiques.css";
 import api from "../services/api";
 
@@ -9,8 +14,7 @@ import api from "../services/api";
 const formatMontant = (n) =>
     Number(n || 0).toLocaleString("fr-FR") + " FCFA";
 
-const formatNombre = (n) =>
-    Number(n || 0).toLocaleString("fr-FR");
+const formatNombre = (n) => Number(n || 0).toLocaleString("fr-FR");
 
 /* ============================================================
    LIBELLÉS DE PÉRIODE
@@ -28,12 +32,45 @@ const LIBELLES_PERIODE = {
 ============================================================ */
 
 const pourcentageValeur = (valeur, total) => {
-    if (!total || Number(total) === 0) {
-        return "0.0";
-    }
-
+    if (!total || Number(total) === 0) return "0.0";
     return ((Number(valeur || 0) / Number(total)) * 100).toFixed(1);
 };
+
+/* ============================================================
+   BOUTONS D'EXPORT
+============================================================ */
+
+function ActionsStat({ stats, cle }) {
+    const lancerExcel = async () => {
+        try {
+            await exporterExcel(construireRapport(cle, stats));
+        } catch (e) {
+            console.error(e);
+            alert(
+                "Export Excel impossible. Vérifiez que le paquet « xlsx » est installé."
+            );
+        }
+    };
+
+    return (
+        <div className="stat-actions">
+            <button
+                type="button"
+                title="Imprimer ou enregistrer en PDF"
+                onClick={() => imprimerRapport(construireRapport(cle, stats))}
+            >
+                🖨 Imprimer / PDF
+            </button>
+            <button
+                type="button"
+                title="Exporter en Excel"
+                onClick={lancerExcel}
+            >
+                📊 Excel
+            </button>
+        </div>
+    );
+}
 
 /* ============================================================
    COMPOSANT
@@ -41,10 +78,7 @@ const pourcentageValeur = (valeur, total) => {
 
 function Statistiques() {
     const [periode, setPeriode] = useState("mois");
-
-    const [date, setDate] = useState(
-        new Date().toISOString().split("T")[0]
-    );
+    const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
 
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -58,11 +92,8 @@ function Statistiques() {
         try {
             setLoading(true);
             setError("");
-
             const data = await api.statistiques.get({ periode, date });
-
             setStats(data);
-
         } catch (err) {
             console.error(err);
             setError(err.message);
@@ -73,17 +104,15 @@ function Statistiques() {
 
     useEffect(() => {
         chargerStats();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [periode, date]);
 
     /* ========================================================
-       CALCUL
+       CALCULS
     ======================================================== */
 
-    const totalDepots =
-        stats?.compteurs?.depots || 0;
-
-    const pourcentage = (n) =>
-        pourcentageValeur(n, totalDepots);
+    const totalDepots = stats?.compteurs?.depots || 0;
+    const pourcentage = (n) => pourcentageValeur(n, totalDepots);
 
     /* ========================================================
        AFFICHAGE
@@ -91,7 +120,6 @@ function Statistiques() {
 
     return (
         <div className="stats-page">
-
             {/* HEADER */}
             <header className="stats-header">
                 <div>
@@ -125,16 +153,14 @@ function Statistiques() {
                 </div>
             </header>
 
-            {/* CHARGEMENT */}
+            {/* CHARGEMENT / ERREUR */}
             {loading && (
                 <div className="stats-loading">
                     Chargement des statistiques...
                 </div>
             )}
 
-            {error && !loading && (
-                <div className="stats-error">{error}</div>
-            )}
+            {error && !loading && <div className="stats-error">{error}</div>}
 
             {!loading && stats && (
                 <>
@@ -152,6 +178,7 @@ function Statistiques() {
                                     <h2>Indicateurs généraux</h2>
                                 </div>
                             </div>
+                            <ActionsStat stats={stats} cle="indicateurs" />
                         </div>
 
                         <div className="stats-kpis">
@@ -186,8 +213,10 @@ function Statistiques() {
                                     {formatNombre(stats.compteurs.transferts)}
                                 </strong>
                                 <small>
-                                    {stats.compteurs.transferts_interne} internes ·{" "}
-                                    {stats.compteurs.transferts_externe} externes
+                                    {stats.compteurs.transferts_interne}{" "}
+                                    internes ·{" "}
+                                    {stats.compteurs.transferts_externe}{" "}
+                                    externes
                                 </small>
                             </div>
 
@@ -199,7 +228,9 @@ function Statistiques() {
                                 <strong>
                                     {stats.conservation.duree_moyenne_jours} j
                                 </strong>
-                                <small>Durée moyenne entre arrivée et sortie</small>
+                                <small>
+                                    Durée moyenne entre arrivée et sortie
+                                </small>
                             </div>
                         </div>
                     </section>
@@ -211,6 +242,7 @@ function Statistiques() {
                                 <span>02</span>
                                 <h2>Répartition par provenance</h2>
                             </div>
+                            <ActionsStat stats={stats} cle="provenance" />
                         </div>
 
                         <div className="horizontal-chart">
@@ -224,15 +256,20 @@ function Statistiques() {
                                     key={row.provenance || "n/a"}
                                 >
                                     <div className="horizontal-label">
-                                        <span>{row.provenance || "Non précisé"}</span>
+                                        <span>
+                                            {row.provenance || "Non précisé"}
+                                        </span>
                                         <strong>
-                                            {row.total} ({pourcentage(row.total)}%)
+                                            {row.total} (
+                                            {pourcentage(row.total)}%)
                                         </strong>
                                     </div>
                                     <div className="horizontal-bar">
                                         <div
                                             style={{
-                                                width: `${pourcentage(row.total)}%`,
+                                                width: `${pourcentage(
+                                                    row.total
+                                                )}%`,
                                             }}
                                         />
                                     </div>
@@ -241,23 +278,20 @@ function Statistiques() {
                         </div>
                     </section>
 
-                    {/* ==================================================
-                        10 - RÉPARTITION PAR SERVICE D'ORIGINE
-                       ================================================== */}
+                    {/* 10 - SERVICE D'ORIGINE */}
                     <section className="stats-panel">
                         <div className="stats-panel-header">
                             <div>
                                 <span>10</span>
                                 <h2>Répartition par service d'origine</h2>
                             </div>
+                            <ActionsStat stats={stats} cle="service" />
                         </div>
 
                         <div className="horizontal-chart">
                             {!stats.par_service ||
                             stats.par_service.length === 0 ? (
-                                <div className="empty-chart">
-                                    Aucune donnée
-                                </div>
+                                <div className="empty-chart">Aucune donnée</div>
                             ) : (
                                 stats.par_service.map((row) => (
                                     <div
@@ -296,6 +330,7 @@ function Statistiques() {
                                 <span>03</span>
                                 <h2>Répartition par motif</h2>
                             </div>
+                            <ActionsStat stats={stats} cle="motif" />
                         </div>
 
                         <div className="horizontal-chart">
@@ -311,13 +346,16 @@ function Statistiques() {
                                     <div className="horizontal-label">
                                         <span>{row.motif || "Non précisé"}</span>
                                         <strong>
-                                            {row.total} ({pourcentage(row.total)}%)
+                                            {row.total} (
+                                            {pourcentage(row.total)}%)
                                         </strong>
                                     </div>
                                     <div className="horizontal-bar">
                                         <div
                                             style={{
-                                                width: `${pourcentage(row.total)}%`,
+                                                width: `${pourcentage(
+                                                    row.total
+                                                )}%`,
                                             }}
                                         />
                                     </div>
@@ -333,6 +371,7 @@ function Statistiques() {
                                 <span>04</span>
                                 <h2>Analyse des transferts</h2>
                             </div>
+                            <ActionsStat stats={stats} cle="transferts" />
                         </div>
 
                         <div className="transfert-analysis">
@@ -379,6 +418,70 @@ function Statistiques() {
                                 </div>
                             </div>
                         </div>
+
+                        <div
+                            className="transfert-analysis"
+                            style={{ marginTop: 20 }}
+                        >
+                            <div className="transfert-total">
+                                <span>DÉLAI MOYEN DÉPÔT → TRANSFERT</span>
+                                <strong>
+                                    {stats.transferts_delai
+                                        ?.moyenne_heures || 0}{" "}
+                                    h
+                                </strong>
+                            </div>
+
+                            <div className="transfert-detail">
+                                <div>
+                                    <span className="distribution-dot interne" />
+                                    <span>Moins de 24 h</span>
+                                    <strong>
+                                        {formatNombre(
+                                            stats.transferts_delai?.moins_24h
+                                        )}
+                                    </strong>
+                                    <small>
+                                        {pourcentageValeur(
+                                            stats.transferts_delai?.moins_24h,
+                                            stats.compteurs.transferts
+                                        )}
+                                        %
+                                    </small>
+                                </div>
+
+                                <div>
+                                    <span className="distribution-dot externe" />
+                                    <span>Plus de 24 h</span>
+                                    <strong>
+                                        {formatNombre(
+                                            stats.transferts_delai?.plus_24h
+                                        )}
+                                    </strong>
+                                    <small>
+                                        {pourcentageValeur(
+                                            stats.transferts_delai?.plus_24h,
+                                            stats.compteurs.transferts
+                                        )}
+                                        %
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        {stats.transferts_delai?.non_calcules > 0 && (
+                            <p
+                                style={{
+                                    marginTop: 10,
+                                    fontSize: 12,
+                                    color: "#8b8194",
+                                }}
+                            >
+                                {stats.transferts_delai.non_calcules}{" "}
+                                transfert(s) non classé(s) (date ou heure
+                                d'arrivée du dépôt manquante).
+                            </p>
+                        )}
                     </section>
 
                     {/* 05 - SEXE */}
@@ -388,6 +491,7 @@ function Statistiques() {
                                 <span>05</span>
                                 <h2>Répartition par sexe</h2>
                             </div>
+                            <ActionsStat stats={stats} cle="sexe" />
                         </div>
 
                         <div className="horizontal-chart">
@@ -403,13 +507,16 @@ function Statistiques() {
                                     <div className="horizontal-label">
                                         <span>{row.sexe || "Non précisé"}</span>
                                         <strong>
-                                            {row.total} ({pourcentage(row.total)}%)
+                                            {row.total} (
+                                            {pourcentage(row.total)}%)
                                         </strong>
                                     </div>
                                     <div className="horizontal-bar">
                                         <div
                                             style={{
-                                                width: `${pourcentage(row.total)}%`,
+                                                width: `${pourcentage(
+                                                    row.total
+                                                )}%`,
                                             }}
                                         />
                                     </div>
@@ -425,6 +532,7 @@ function Statistiques() {
                                 <span>06</span>
                                 <h2>Durée de conservation</h2>
                             </div>
+                            <ActionsStat stats={stats} cle="conservation" />
                         </div>
 
                         <div className="conservation-card">
@@ -444,6 +552,7 @@ function Statistiques() {
                                 <span>07</span>
                                 <h2>Répartition par chapelle</h2>
                             </div>
+                            <ActionsStat stats={stats} cle="chapelle" />
                         </div>
 
                         <div className="simple-stat-table">
@@ -457,7 +566,9 @@ function Statistiques() {
                                 <tbody>
                                     {stats.par_chapelle.map((row) => (
                                         <tr key={row.chapelle || "n/a"}>
-                                            <td>{row.chapelle || "Non précisé"}</td>
+                                            <td>
+                                                {row.chapelle || "Non précisé"}
+                                            </td>
                                             <td>{formatNombre(row.total)}</td>
                                         </tr>
                                     ))}
@@ -473,6 +584,7 @@ function Statistiques() {
                                 <span>08</span>
                                 <h2>Les emplacements les plus utilisés</h2>
                             </div>
+                            <ActionsStat stats={stats} cle="emplacements" />
                         </div>
 
                         <div className="horizontal-chart">
@@ -508,6 +620,7 @@ function Statistiques() {
                                 <span>09</span>
                                 <h2>Synthèse financière</h2>
                             </div>
+                            <ActionsStat stats={stats} cle="finance" />
                         </div>
 
                         <div className="finance-list">

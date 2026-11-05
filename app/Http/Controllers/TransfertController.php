@@ -30,6 +30,11 @@ class TransfertController extends Controller
 
     public function store(Request $request)
     {
+
+    $depot = \App\Models\Depot::find($request->depot_id);
+if ($depot && $depot->scelle) {
+    return response()->json(['message' => 'Ce corps est scellé.'], 423);
+}
         $validated = $request->validate($this->rules());
 
         return DB::transaction(function () use ($validated) {
@@ -50,6 +55,7 @@ class TransfertController extends Controller
                 'heure'      => $validated['heure'],
                 'depot_id'   => $depot->id,
                 'type'       => $validated['type'],
+                'motif'      => trim($validated['motif']),
                 'statut'     => $validated['statut'] ?? 'EN ATTENTE',
                 'provenance' => $provenance,
             ];
@@ -111,6 +117,11 @@ class TransfertController extends Controller
 
     public function update(Request $request, Transfert $transfert)
     {
+
+    $depot = \App\Models\Depot::find($request->depot_id);
+if ($depot && $depot->scelle) {
+    return response()->json(['message' => 'Ce corps est scellé.'], 423);
+}
         $validated = $request->validate($this->rules());
 
         return DB::transaction(function () use ($validated, $transfert) {
@@ -180,6 +191,10 @@ class TransfertController extends Controller
 
     public function destroy(Request $request, Transfert $transfert)
     {
+ $depot = $transfert->depot;
+if ($depot && $depot->scelle) {
+    return response()->json(['message' => 'Ce corps est scellé.'], 423);
+}
         $this->mettreEnCorbeille(
             'TRANSFERT',
             $transfert->id,
@@ -203,11 +218,12 @@ class TransfertController extends Controller
         return [
             'depot_id'                => 'required|exists:depots,id',
             'type'                    => 'required|in:interne,externe',
+            'motif'                   => 'required|string|max:255',
             'date'                    => 'required|date',
             'heure'                   => 'required',
             'emplacement_destination' => 'nullable|string|max:255',
             'destination'             => 'nullable|string|max:255',
-            'statut'                  => 'required|in:EN ATTENTE,VALIDÉ',
+            'statut'                  => 'nullable|in:EN ATTENTE,VALIDÉ',
         ];
     }
 }

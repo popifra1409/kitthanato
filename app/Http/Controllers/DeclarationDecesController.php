@@ -192,6 +192,11 @@ class DeclarationDecesController extends Controller
 
     public function store(Request $request)
     {
+
+    $depot = \App\Models\Depot::find($request->depot_id);
+if ($depot && $depot->scelle) {
+    return response()->json(['message' => 'Ce corps est scellé.'], 423);
+}
         $validated = $request->validate([
 
             'depot_id' =>
@@ -340,7 +345,10 @@ class DeclarationDecesController extends Controller
         Request $request,
         $id
     ) {
-
+$depot = \App\Models\Depot::find($request->depot_id);
+if ($depot && $depot->scelle) {
+    return response()->json(['message' => 'Ce corps est scellé.'], 423);
+}
         $declaration =
             DeclarationDeces::findOrFail($id);
 
@@ -374,6 +382,11 @@ class DeclarationDecesController extends Controller
 
     public function destroy(Request $request, $id)
     {
+
+    $depot = \App\Models\Depot::find($request->depot_id);
+if ($depot && $depot->scelle) {
+    return response()->json(['message' => 'Ce corps est scellé.'], 423);
+}
         $declaration =
             DeclarationDeces::findOrFail($id);
 

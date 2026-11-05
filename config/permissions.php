@@ -36,6 +36,7 @@ return [
                 'create' => 'Enregistrer un dépôt',
                 'update' => 'Modifier un dépôt',
                 'delete' => 'Supprimer un dépôt',
+                'sceller' => 'Sceller / desceller un corps',
             ],
         ],
 

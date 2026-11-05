@@ -49,6 +49,9 @@ export const auth = {
 export const depots = {
     ...ressource("depots"),
     disponibles: () => get("/depots-disponibles"),
+        assignBox: (id, box_name) => put(`/depots/${id}/box`, { box_name }),
+sceller: (id) => put(`/depots/${id}/sceller`, {}),
+desceller: (id) => put(`/depots/${id}/desceller`, {}),
 };
 
 export const sorties = {
@@ -68,6 +71,7 @@ export const declarations = {
     dashboard: () => get("/declarations/dashboard"),
     defunts: () => get("/declarations/defunts"),
     depot: (depotId) => get(`/declarations/depot/${depotId}`),
+
 };
 
 export const statistiques = {

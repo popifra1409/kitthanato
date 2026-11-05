@@ -18,6 +18,7 @@ class Transfert extends Model
         'depot_id',
         'provenance',
         'type',
+        'motif',
         'emplacement_destination',
         'destination',
         'statut',
