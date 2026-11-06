@@ -26,10 +26,13 @@ use Illuminate\Support\Str;
  *  - si le compte n'existe pas : il est créé ;
  *  - s'il existe (même supprimé ou désactivé) : il est restauré, réactivé
  *    et rattaché au rôle ADMIN ;
- *  - le mot de passe n'est (re)défini que si SUPER_ADMIN_PASSWORD est
- *    renseigné, ou à la création. Sans SUPER_ADMIN_PASSWORD, un mot de
- *    passe par défaut est utilisé en local, un mot de passe aléatoire
- *    en production — il est affiché une seule fois dans la console.
+ *  - le mot de passe est celui de SUPER_ADMIN_PASSWORD s'il est renseigné ;
+ *  - sinon, hors production, le mot de passe défini dans cette classe
+ *    (MOT_DE_PASSE_LOCAL) est réappliqué à chaque exécution, y compris sur
+ *    un compte existant : aucune variable .env n'est nécessaire ;
+ *  - en production, sans SUPER_ADMIN_PASSWORD, le mot de passe d'un compte
+ *    existant n'est pas écrasé ; à la création un mot de passe aléatoire
+ *    est généré et affiché une seule fois dans la console.
  *
  * Le seeder peut être relancé sans risque.
  */
@@ -61,8 +64,12 @@ class SuperAdminSeeder extends Seeder
 
                 $user = new User(['name' => $nom]);
                 $user->password = $motDePasse;
-            } elseif ($motDePasseEnv !== '') {
-                $user->password = $motDePasseEnv;
+            } elseif ($motDePasseEnv !== '' || !app()->environment('production')) {
+                // Hors production, le seeder réimpose son mot de passe : le
+                // compte reste accessible même si celui du compte est perdu.
+                $motDePasse = $motDePasseEnv !== '' ? $motDePasseEnv : self::MOT_DE_PASSE_LOCAL;
+                $user->password = $motDePasse;
+                $motDePasseAffiche = $motDePasseEnv !== '' ? null : $motDePasse;
             }
 
             if ($user->trashed()) {
