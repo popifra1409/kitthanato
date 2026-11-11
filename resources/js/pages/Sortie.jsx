@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import "./Sortie.css";
 import ConfirmDialog from "../components/ConfirmDialog";
 import NotificationBox from "../components/NotificationBox";
@@ -202,6 +203,9 @@ export default function Sortie() {
        ÉTATS
     ===================================================== */
 
+    const [searchParams] = useSearchParams();
+    const lienDepotTraite = useRef(false);
+
     const [sorties, setSorties] = useState([]);
     const [depots, setDepots] = useState([]);
     const [chapelles, setChapelles] = useState([]);
@@ -362,7 +366,49 @@ export default function Sortie() {
 
     const chargerDepots = async () => {
         try {
-            setDepots(asList(await api.depots.list(), "depots"));
+            const liste = asList(await api.depots.list(), "depots");
+            setDepots(liste);
+
+            if (!lienDepotTraite.current) {
+                lienDepotTraite.current = true;
+
+                if (searchParams.get("nouveau") === "1") {
+                    setForm({
+                        id: null,
+                        depot_id: "",
+                        date: getToday(),
+                        heure: getCurrentTime(),
+                        recuperateur: "",
+                        chapelle_id: "",
+                        duree_levee: 60,
+                        prestations: [],
+                    });
+                    setRechercheDefunt("");
+                    setAfficherSuggestions(false);
+                    setShowFormulaire(true);
+                }
+
+                const cible = Number(searchParams.get("depot"));
+                const depotCible = liste.find(
+                    (depot) => Number(depot.id) === cible
+                );
+
+                if (depotCible) {
+                    setForm({
+                        id: null,
+                        depot_id: depotCible.id,
+                        date: getToday(),
+                        heure: getCurrentTime(),
+                        recuperateur: "",
+                        chapelle_id: "",
+                        duree_levee: 60,
+                        prestations: [],
+                    });
+                    setRechercheDefunt(nomDefunt(depotCible));
+                    setAfficherSuggestions(false);
+                    setShowFormulaire(true);
+                }
+            }
         } catch (error) {
             console.error("Erreur chargement dépôts :", error);
         }

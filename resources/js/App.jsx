@@ -16,6 +16,7 @@ import Recu from "./pages/Recu";
 import DeclarationDeces from "./pages/DeclarationDeces";
 import { SessionProvider } from "./services/SessionContext";
 import GenreDeMort from "./pages/GenreDeMort";
+import Emplacements from "./pages/Emplacements";
 
 /* =====================================================
    ROUTES PROTÉGÉES
@@ -26,6 +27,7 @@ import GenreDeMort from "./pages/GenreDeMort";
 const PAGES = [
     { path: "/dashboard", permission: "dashboard.view", element: <Dashboard /> },
     { path: "/DepotCorps", permission: "depots.view", element: <DepotCorps /> },
+    { path: "/Emplacements", permission: "emplacements.view", element: <Emplacements /> },
     { path: "/transfert", permission: "transferts.view", element: <Transfert /> },
     { path: "/PlanningLevees", permission: "levees.view", element: <PlanningLevees /> },
     { path: "/Sortie", permission: "sorties.view", element: <Sortie /> },

@@ -198,3 +198,55 @@
 
     color: #4a3a5a;
 }
+
+@media (max-width: 700px) {
+    .corbeille-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 16px;
+    }
+
+    .corbeille-search {
+        max-width: none;
+    }
+
+    .corbeille-filter {
+        justify-content: space-between;
+    }
+
+    .corbeille-filter select {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .corbeille-detail-modal {
+        max-height: 92vh;
+    }
+
+    .corbeille-detail-modal .modal-header {
+        padding: 16px 18px;
+    }
+
+    .corbeille-detail-modal .modal-header h2 {
+        font-size: 16px;
+    }
+
+    .detail-content {
+        padding: 18px;
+    }
+
+    .detail-line {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .detail-line strong {
+        word-break: break-word;
+    }
+
+    .detail-donnees pre {
+        max-height: 40vh;
+        padding: 12px;
+    }
+}

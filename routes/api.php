@@ -13,12 +13,15 @@ use App\Http\Controllers\TransfertController;
 use App\Http\Controllers\PrestationController;
 use App\Http\Controllers\ProfessionController;
 use App\Http\Controllers\ChapelleController;
+use App\Http\Controllers\ChambreFroideController;
 use App\Http\Controllers\StatistiqueController;
 use App\Http\Controllers\CorbeilleController;
 use App\Http\Controllers\HistoriqueController;
 use App\Http\Controllers\DeclarationDecesController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\CertificatGenreMortController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\RechercheController;
 /*
 |--------------------------------------------------------------------------
 | API REST
@@ -41,6 +44,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/me', [AuthentificationController::class, 'me']);
     Route::put('/me/password', [AuthentificationController::class, 'changePassword']);
 
+    /* ---------- TABLEAU DE BORD ---------- */
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->middleware('permission:dashboard.view');
+
+    /* ---------- RECHERCHE GLOBALE ---------- */
+    Route::get('/recherche', [RechercheController::class, 'index']);
+
     /* ---------- RÉFÉRENTIELS (lecture pour tout utilisateur connecté) ---------- */
     Route::get('/prestations', [PrestationController::class, 'index']);
     Route::get('/chapelles', [ChapelleController::class, 'index']);
@@ -57,16 +67,32 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::middleware('permission:depots.view')->group(function () {
         Route::get('/depots', [DepotController::class, 'index']);
         Route::get('/depots-disponibles', [DepotController::class, 'corpsDisponibles']);
+        Route::get('/caissons-disponibles', [DepotController::class, 'caissonsDisponibles']);
         Route::get('/depots/{id}', [DepotController::class, 'show']);
 
     });
     Route::post('/depots', [DepotController::class, 'store'])->middleware('permission:depots.create');
     Route::put('/depots/{id}', [DepotController::class, 'update'])->middleware('permission:depots.update');
-    Route::put('/depots/{id}/box', [DepotController::class, 'assignBox']);
+    Route::put('/depots/{id}/box', [DepotController::class, 'assignBox'])->middleware('permission:depots.update');
     Route::delete('/depots/{id}', [DepotController::class, 'destroy'])->middleware('permission:depots.delete');
 
     Route::put('/depots/{id}/sceller', [DepotController::class, 'sceller'])->middleware('permission:depots.sceller');
 Route::put('/depots/{id}/desceller', [DepotController::class, 'desceller'])->middleware('permission:depots.sceller');
+
+    /* ---------- EMPLACEMENTS (chambres froides & caissons) ---------- */
+    Route::get('/chambres-froides', [ChambreFroideController::class, 'index'])
+        ->middleware('permission:emplacements.view');
+    Route::get('/emplacements/plan', [ChambreFroideController::class, 'plan'])
+        ->middleware('permission:emplacements.view');
+
+    Route::middleware('permission:emplacements.manage')->group(function () {
+        Route::post('/chambres-froides', [ChambreFroideController::class, 'store']);
+        Route::put('/chambres-froides/{chambreFroide}', [ChambreFroideController::class, 'update']);
+        Route::put('/chambres-froides/{chambreFroide}/actif', [ChambreFroideController::class, 'toggleActif']);
+        Route::post('/chambres-froides/{chambreFroide}/caissons', [ChambreFroideController::class, 'storeCaisson']);
+        Route::put('/caissons/{caisson}', [ChambreFroideController::class, 'updateCaisson']);
+        Route::put('/caissons/{caisson}/actif', [ChambreFroideController::class, 'toggleCaissonActif']);
+    });
 
     /* ---------- SORTIES ---------- */
     Route::middleware('permission:sorties.view')->group(function () {

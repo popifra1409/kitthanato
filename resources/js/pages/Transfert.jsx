@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import "./Transfert.css";
 import ConfirmDialog from "../components/ConfirmDialog";
 import NotificationBox from "../components/NotificationBox";
@@ -10,6 +11,9 @@ function Transfert() {
     /* =====================================================
        ÉTATS
     ===================================================== */
+
+    const [searchParams] = useSearchParams();
+    const lienDepotTraite = useRef(false);
 
     const [transferts, setTransferts] = useState([]);
     const [depots, setDepots] = useState([]);
@@ -165,8 +169,39 @@ function Transfert() {
             setLoadingDepots(true);
 
             const result = await api.depots.list();
+            const liste = extractList(result);
 
-            setDepots(extractList(result));
+            setDepots(liste);
+
+            if (!lienDepotTraite.current) {
+                lienDepotTraite.current = true;
+
+                if (searchParams.get("nouveau") === "1") {
+                    setEditingId(null);
+                    setEmplacementInitial("");
+                    setShowForm(true);
+                }
+
+                const cible = Number(searchParams.get("depot"));
+                const depotCible = liste.find(
+                    (depot) => Number(depot.id) === cible
+                );
+
+                if (depotCible) {
+                    setEditingId(null);
+                    setEmplacementInitial("");
+                    setFormData({
+                        date: getDateAujourdhui(),
+                        heure: "",
+                        depot_id: String(depotCible.id),
+                        type: "",
+                        emplacement_destination: "",
+                        destination: "",
+                        motif: "",
+                    });
+                    setShowForm(true);
+                }
+            }
         } catch (error) {
             console.error("Erreur chargement dépôts :", error);
             showNotif(

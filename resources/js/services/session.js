@@ -79,6 +79,7 @@ export function pageAccueil(user = getUser()) {
     const ordre = [
         ["dashboard.view", "/dashboard"],
         ["depots.view", "/DepotCorps"],
+        ["emplacements.view", "/Emplacements"],
         ["declarations.view", "/declarations"],
         ["sorties.view", "/Sortie"],
         ["transferts.view", "/transfert"],

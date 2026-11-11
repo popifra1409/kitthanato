@@ -2917,6 +2917,7 @@ button.profession-ajouter {
   gap: 16px;
 }
 .box-modal-info { margin: 0; color: #54209e; font-size: 15px; font-weight: 700; }
+.box-modal-vide { margin: 0; color: #b23b5c; font-size: 13px; font-weight: 600; }
 
 /* ---------- Détails : déposants ---------- */
 .details-deposants { margin-top: 24px; }

@@ -92,6 +92,14 @@ return [
             ],
         ],
 
+        'emplacements' => [
+            'libelle' => 'Emplacements des corps',
+            'permissions' => [
+                'view'   => 'Consulter les chambres froides et caissons',
+                'manage' => 'Gérer les chambres froides et caissons',
+            ],
+        ],
+
         'utilisateurs' => [
             'libelle' => 'Utilisateurs',
             'permissions' => [

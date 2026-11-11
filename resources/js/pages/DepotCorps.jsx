@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import "./DepotCorps.css";
 import ConfirmDialog from "../components/ConfirmDialog";
 import NotificationBox from "../components/NotificationBox";
@@ -88,12 +89,26 @@ const deposantVide = () => ({
     lien_parente: "",
 });
 
+/* Libellé de l'emplacement : caisson structuré, sinon ancien box texte. */
+const libelleCaisson = (depot) => {
+    if (depot?.caisson) {
+        const chambre = depot.caisson.chambre_froide?.nom;
+        return chambre
+            ? `${chambre} · ${depot.caisson.code}`
+            : depot.caisson.code;
+    }
+    return depot?.box_name || "";
+};
+
 function DepotCorps() {
     const getNomEnregistreur = (depot) => depot?.createur?.name || "-";
 
     /* =====================================================
        ÉTATS
     ===================================================== */
+
+    const [searchParams] = useSearchParams();
+    const lienDepotTraite = useRef(false);
 
     const [depots, setDepots] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -150,10 +165,12 @@ function DepotCorps() {
     const [deposants, setDeposants] = useState([]);
     const [deposantCourant, setDeposantCourant] = useState(deposantVide());
 
-    /* Box */
+    /* Box / caisson */
     const [boxOpen, setBoxOpen] = useState(false);
     const [boxDepot, setBoxDepot] = useState(null);
-    const [boxName, setBoxName] = useState("");
+    const [boxCaisson, setBoxCaisson] = useState("");
+    const [chambresCaissons, setChambresCaissons] = useState([]);
+    const [boxChargement, setBoxChargement] = useState(false);
     const [boxLoading, setBoxLoading] = useState(false);
 
     /* =====================================================
@@ -251,7 +268,31 @@ function DepotCorps() {
         try {
             setLoading(true);
             const data = await api.depots.list();
-            setDepots(asList(data, "depots"));
+            const liste = asList(data, "depots");
+            setDepots(liste);
+
+            if (!lienDepotTraite.current) {
+                lienDepotTraite.current = true;
+
+                if (searchParams.get("nouveau") === "1") {
+                    setEditingId(null);
+                    setFormData((actuel) => ({
+                        ...actuel,
+                        code_defunt: prochainCodeDefunt(liste),
+                    }));
+                    setShowForm(true);
+                }
+
+                const cible = Number(searchParams.get("depot"));
+                const depotCible = liste.find(
+                    (depot) => Number(depot.id) === cible
+                );
+
+                if (depotCible) {
+                    setSelectedDepot(depotCible);
+                    setShowDetails(true);
+                }
+            }
         } catch (error) {
             console.error(error);
             showNotif(
@@ -873,57 +914,78 @@ function DepotCorps() {
        BOX
     ===================================================== */
 
-    const ouvrirBox = (depot) => {
+    const ouvrirBox = async (depot) => {
         if ((depot.statut || "PRÉSENT") !== "PRÉSENT") {
             showNotif(
                 "error",
                 "Action impossible",
-                "Un box ne peut être attribué qu'à un corps présent."
+                "Un caisson ne peut être attribué qu'à un corps présent."
             );
             return;
         }
         setBoxDepot(depot);
-        setBoxName(depot.box_name || "");
+        setBoxCaisson(depot.caisson_id ? String(depot.caisson_id) : "");
+        setChambresCaissons([]);
         setBoxOpen(true);
+        setBoxChargement(true);
+        try {
+            const reponse = await api.depots.caissonsDisponibles(depot.id);
+            setChambresCaissons(reponse?.chambres || []);
+        } catch (error) {
+            console.error(error);
+            showNotif(
+                "error",
+                "Échec",
+                error.firstMessage ||
+                    error.message ||
+                    "Impossible de charger les caissons."
+            );
+            setBoxOpen(false);
+            setBoxDepot(null);
+        } finally {
+            setBoxChargement(false);
+        }
     };
 
     const fermerBox = () => {
         if (boxLoading) return;
         setBoxOpen(false);
         setBoxDepot(null);
-        setBoxName("");
+        setBoxCaisson("");
+        setChambresCaissons([]);
     };
 
     const enregistrerBox = async (e) => {
         if (e) e.preventDefault();
-        const nom = boxName.trim();
-        if (!nom) {
+        if (!boxCaisson) {
             showNotif(
                 "error",
                 "Champ manquant",
-                "Veuillez saisir le nom du box."
+                "Veuillez sélectionner un caisson."
             );
             return;
         }
         try {
             setBoxLoading(true);
-            if (typeof api.depots.assignBox === "function") {
-                await api.depots.assignBox(boxDepot.id, nom);
-            } else {
-                await api.depots.update(boxDepot.id, { box_name: nom });
-            }
+            const reponse = await api.depots.assignBox(
+                boxDepot.id,
+                Number(boxCaisson)
+            );
             setDepots((liste) =>
                 liste.map((d) =>
-                    d.id === boxDepot.id ? { ...d, box_name: nom } : d
+                    d.id === boxDepot.id
+                        ? { ...d, ...(reponse?.depot || {}) }
+                        : d
                 )
             );
             setBoxOpen(false);
             setBoxDepot(null);
-            setBoxName("");
+            setBoxCaisson("");
+            setChambresCaissons([]);
             showNotif(
                 "success",
-                "Box attribué",
-                `Le box « ${nom} » a été attribué.`
+                "Caisson attribué",
+                reponse?.message || "Le caisson a été attribué."
             );
         } catch (error) {
             console.error(error);
@@ -932,7 +994,7 @@ function DepotCorps() {
                 "Échec",
                 error.firstMessage ||
                     error.message ||
-                    "Impossible d'attribuer le box."
+                    "Impossible d'attribuer le caisson."
             );
         } finally {
             setBoxLoading(false);
@@ -1056,7 +1118,7 @@ function DepotCorps() {
             depot.service_origine,
             depot.lieu_provenance,
             depot.emplacement,
-            depot.box_name,
+            libelleCaisson(depot),
             depot.chapelle,
             depot.contact_nom,
             depot.statut,
@@ -1212,9 +1274,9 @@ function DepotCorps() {
                                             <span className="emplacement-badge">
                                                 {depot.emplacement || "-"}
                                             </span>
-                                            {depot.box_name && (
+                                            {libelleCaisson(depot) && (
                                                 <span className="box-badge">
-                                                    {depot.box_name}
+                                                    {libelleCaisson(depot)}
                                                 </span>
                                             )}
                                         </td>
@@ -1331,7 +1393,7 @@ function DepotCorps() {
                                                                         setOpenMenuId(null);
                                                                     }}
                                                                 >
-                                                                    📦 Attribuer un box
+                                                                    📦 Attribuer un caisson
                                                                 </button>
                                                             )}
 
@@ -2000,12 +2062,12 @@ function DepotCorps() {
                 </div>
             )}
 
-            {/* BOX */}
+            {/* CAISSON */}
             {boxOpen && boxDepot && (
                 <div className="modal-overlay">
                     <div className="box-modal">
                         <div className="modal-header">
-                            <h2>Attribuer un box</h2>
+                            <h2>Attribuer un caisson</h2>
                             <button
                                 type="button"
                                 className="modal-close"
@@ -2019,15 +2081,53 @@ function DepotCorps() {
                                 {boxDepot.nom} {boxDepot.prenom} — {boxDepot.code}
                             </p>
                             <div className="form-group">
-                                <label>Nom du box *</label>
-                                <input
-                                    type="text"
-                                    value={boxName}
-                                    onChange={(e) => setBoxName(e.target.value)}
-                                    placeholder="Ex : E1"
+                                <label>Caisson *</label>
+                                <select
+                                    value={boxCaisson}
+                                    onChange={(e) => setBoxCaisson(e.target.value)}
+                                    disabled={boxChargement || boxLoading}
                                     autoFocus
-                                />
+                                >
+                                    <option value="">
+                                        {boxChargement
+                                            ? "Chargement..."
+                                            : "— Sélectionner un caisson —"}
+                                    </option>
+                                    {chambresCaissons.map((chambre) => (
+                                        <optgroup
+                                            key={chambre.id}
+                                            label={`${chambre.nom} (${
+                                                chambre.type === "individuelle"
+                                                    ? "individuelle"
+                                                    : "commune"
+                                            })`}
+                                        >
+                                            {chambre.caissons.map((caisson) => (
+                                                <option
+                                                    key={caisson.id}
+                                                    value={caisson.id}
+                                                    disabled={
+                                                        !caisson.disponible &&
+                                                        caisson.id !== boxDepot.caisson_id
+                                                    }
+                                                >
+                                                    {caisson.code}
+                                                    {caisson.occupants > 0
+                                                        ? caisson.capacite === 1
+                                                            ? " — occupé"
+                                                            : ` — ${caisson.occupants} corps`
+                                                        : " — libre"}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    ))}
+                                </select>
                             </div>
+                            {!boxChargement && chambresCaissons.length === 0 && (
+                                <p className="box-modal-vide">
+                                    Aucun caisson actif. Créez-en dans Emplacements.
+                                </p>
+                            )}
                             <div className="form-buttons">
                                 <button
                                     type="button"
@@ -2040,7 +2140,9 @@ function DepotCorps() {
                                 <button
                                     type="submit"
                                     className="button-save"
-                                    disabled={boxLoading}
+                                    disabled={
+                                        boxLoading || boxChargement || !boxCaisson
+                                    }
                                 >
                                     {boxLoading ? "Enregistrement..." : "Enregistrer"}
                                 </button>
@@ -2109,8 +2211,8 @@ function DepotCorps() {
                                     <span>{selectedDepot.emplacement || "-"}</span>
                                 </div>
                                 <div className="detail-item">
-                                    <label>Box attribué</label>
-                                    <span>{selectedDepot.box_name || "-"}</span>
+                                    <label>Caisson attribué</label>
+                                    <span>{libelleCaisson(selectedDepot) || "-"}</span>
                                 </div>
                                 <div className="detail-item">
                                     <label>Chapelle</label>

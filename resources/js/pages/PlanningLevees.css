@@ -796,19 +796,23 @@ body.dark-mode .levee-row:hover {
 
         padding: 15px 18px;
     }
+}
 
-    /* =====================================================
+/* =====================================================
    LEVÉE TERMINÉE (ligne grisée)
 ===================================================== */
 
 .levee-row.levee-terminee {
     opacity: 0.55;
-    background: #f8f6fa;
+    background: var(--lv-surface-soft);
 }
 
 .levee-row.levee-terminee .levee-defunt strong {
     color: #a10e0e;
-    background-color: #a10e0e ;
+}
+
+body.dark-mode .levee-row.levee-terminee .levee-defunt strong {
+    color: #fca5a5;
 }
 
 /* =====================================================
@@ -816,50 +820,14 @@ body.dark-mode .levee-row:hover {
 ===================================================== */
 
 .levee-status.termine {
-    background: #e8e6ec;
+    background: var(--lv-surface-soft);
     color: #a10e0e;
 }
 
 .levee-status.termine .status-dot {
-    background: #a10e0e;
+    background: currentColor;
 }
 
-/* =====================================================
-   STATUT CONFIRMÉ (vert)
-===================================================== */
-
-.levee-status.confirme {
-    background: #e7f7ee;
-    color: #248454;
-}
-
-.levee-status.confirme .status-dot {
-    background: #248454;
-}
-
-/* =====================================================
-   STATUT EN ATTENTE (orange)
-===================================================== */
-
-.levee-status.attente {
-    background: #fff4dc;
-    color: #b47b00;
-}
-
-.levee-status.attente .status-dot {
-    background: #b47b00;
-}
-
-/* =====================================================
-   STATUT PLANIFIÉ (violet)
-===================================================== */
-
-.levee-status.planifie {
-    background: #ede9fe;
-    color: #6d28d9;
-}
-
-.levee-status.planifie .status-dot {
-    background: #6d28d9;
-}
+body.dark-mode .levee-status.termine {
+    color: #fca5a5;
 }

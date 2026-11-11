@@ -51,6 +51,7 @@ class Depot extends Model
         'montant_prestations',
         'statut',
         'box_name',
+        'caisson_id',
     ];
 
     protected $casts = [
@@ -110,6 +111,22 @@ class Depot extends Model
      public function depositants()
     {
         return $this->hasMany(\App\Models\Deposant::class);
+    }
+
+    public function caisson()
+    {
+        return $this->belongsTo(\App\Models\Caisson::class);
+    }
+
+    /**
+     * Corps encore physiquement dans l'établissement : pas de date de
+     * sortie, pas de sortie payée, pas de transfert externe.
+     */
+    public function scopePresents($query)
+    {
+        return $query->whereNull('date_sortie')
+            ->whereDoesntHave('sorties', fn ($q) => $q->where('montant_paye', '>', 0))
+            ->whereDoesntHave('transferts', fn ($q) => $q->whereRaw('LOWER(type) = ?', ['externe']));
     }
 
     public function scelleur()

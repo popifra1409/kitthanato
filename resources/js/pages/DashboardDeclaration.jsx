@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSearchParams } from "react-router-dom";
 import "./DashboardDeclaration.css";
 import DeclarationDeces from "./DeclarationDeces";
 
@@ -50,6 +51,9 @@ const dateCourte = (date) => {
 export default function DashboardDeclaration() {
     /* ---------- ÉTATS ---------- */
 
+    const [searchParams] = useSearchParams();
+    const lienDepotTraite = useRef(false);
+
     const [declarations, setDeclarations] = useState([]);
     const [depots, setDepots] = useState([]);
 
@@ -65,7 +69,10 @@ export default function DashboardDeclaration() {
     const [erreur, setErreur] = useState("");
     const [message, setMessage] = useState("");
 
-    const [recherche, setRecherche] = useState("");
+    /* La recherche de la navbar arrive par ?q= ; dès que l'utilisateur
+       saisit lui-même, sa saisie locale prend le dessus. */
+    const [rechercheSaisie, setRechercheSaisie] = useState(null);
+    const recherche = rechercheSaisie ?? (searchParams.get("q") || "");
     const [filtreStatut, setFiltreStatut] = useState("TOUS");
 
     const [modal, setModal] = useState(false);
@@ -155,60 +162,10 @@ export default function DashboardDeclaration() {
     });
 
     /* =====================================================
-       CHARGEMENT
-    ===================================================== */
-
-    const charger = async () => {
-        setChargement(true);
-        setErreur("");
-
-        try {
-            const [declarationsData, dashboardData, depotsData] =
-                await Promise.all([
-                    api.declarations.list(),
-                    api.declarations.dashboard(),
-                    api.declarations.defunts(),
-                ]);
-
-            const listeDeclarations = asList(declarationsData);
-            const listeDepots = asList(depotsData);
-
-            setDeclarations(listeDeclarations);
-            setDepots(listeDepots);
-            setDashboard(dashboardData || {});
-        } catch (error) {
-            console.error("Erreur déclarations :", error);
-            setErreur(
-                error.firstMessage ||
-                    "Impossible de charger les déclarations."
-            );
-        } finally {
-            setChargement(false);
-        }
-    };
-
-    useEffect(() => {
-        charger();
-    }, []);
-
-    /* =====================================================
-       NOUVELLE DÉCLARATION
-    ===================================================== */
-
-    const nouvelleDeclaration = () => {
-        setForm(formulaireVide());
-        setErreur("");
-        setMessage("");
-        setModal(true);
-    };
-
-    /* =====================================================
        CHOIX DU DÉFUNT
     ===================================================== */
 
-    const choisirDefunt = async (event) => {
-        const depotId = event.target.value;
-
+    async function preRemplirDepuisDepot(depotId) {
         if (!depotId) {
             setForm(formulaireVide());
             return;
@@ -249,7 +206,83 @@ export default function DashboardDeclaration() {
                 "Impossible de récupérer les informations du dépôt."
             );
         }
+    }
+
+    /* =====================================================
+       CHARGEMENT
+    ===================================================== */
+
+    const charger = async () => {
+        setChargement(true);
+        setErreur("");
+
+        try {
+            const [declarationsData, dashboardData, depotsData] =
+                await Promise.all([
+                    api.declarations.list(),
+                    api.declarations.dashboard(),
+                    api.declarations.defunts(),
+                ]);
+
+            const listeDeclarations = asList(declarationsData);
+            const listeDepots = asList(depotsData);
+
+            setDeclarations(listeDeclarations);
+            setDepots(listeDepots);
+            setDashboard(dashboardData || {});
+
+            if (!lienDepotTraite.current) {
+                lienDepotTraite.current = true;
+
+                if (searchParams.get("nouveau") === "1") {
+                    setForm(formulaireVide());
+                    setModal(true);
+                }
+
+                const cible = Number(searchParams.get("depot"));
+
+                if (
+                    cible &&
+                    listeDepots.some(
+                        (depot) => Number(depot.id) === cible
+                    )
+                ) {
+                    setModal(true);
+                    await preRemplirDepuisDepot(cible);
+                }
+            }
+        } catch (error) {
+            console.error("Erreur déclarations :", error);
+            setErreur(
+                error.firstMessage ||
+                    "Impossible de charger les déclarations."
+            );
+        } finally {
+            setChargement(false);
+        }
     };
+
+    useEffect(() => {
+        charger();
+    }, []);
+
+    /* =====================================================
+       NOUVELLE DÉCLARATION
+    ===================================================== */
+
+    const nouvelleDeclaration = () => {
+        setForm(formulaireVide());
+        setErreur("");
+        setMessage("");
+        setModal(true);
+    };
+
+    /* =====================================================
+       CHOIX DU DÉFUNT
+    ===================================================== */
+
+    const choisirDefunt = (event) =>
+        preRemplirDepuisDepot(event.target.value);
 
     /* =====================================================
        CHANGEMENT
@@ -506,7 +539,7 @@ useEffect(() => {
                             placeholder="Rechercher par nom, numéro..."
                             value={recherche}
                             onChange={(event) =>
-                                setRecherche(event.target.value)
+                                setRechercheSaisie(event.target.value)
                             }
                         />
                     </div>

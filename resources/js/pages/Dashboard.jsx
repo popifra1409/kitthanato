@@ -1,283 +1,118 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./Dashboard.css";
-import api, { asList } from "../services/api";
+import api from "../services/api";
+import { useSession } from "../services/SessionContext";
+import {
+    CourbeFlux,
+    DonutOccupation,
+} from "../components/DashboardCharts";
 
-function Dashboard() {
-    const [depots, setDepots] = useState([]);
-    const [sorties, setSorties] = useState([]);
-    const [transferts, setTransferts] = useState([]);
+/* =========================================================
+   OUTILS
+========================================================= */
 
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
-    const [historique, setHistorique] = useState([]);
+const nomDefunt = (item) =>
+    `${item?.nom || ""} ${item?.prenom || ""}`.trim() || "Sans nom";
 
-    const chargerDonnees = async () => {
-    try {
-        setLoading(true);
-        setError("");
+const dateCourte = (valeur) => {
+    if (!valeur) return "—";
 
-        const [depotsData, sortiesData, transfertsData] = await Promise.all([
-            api.depots.list(),
-            api.sorties.list(),
-            api.transferts.list(),
-        ]);
+    const [annee, mois, jour] = String(valeur).substring(0, 10).split("-");
 
-        const depotsListe = asList(depotsData);
-        const sortiesListe = asList(sortiesData);
-        const transfertsListe = asList(transfertsData);
+    if (!annee || !mois || !jour) return valeur;
 
-        setDepots(depotsListe);
-        setSorties(sortiesListe);
-        setTransferts(transfertsListe);
-
-        // =========================
-        // CONSTRUCTION HISTORIQUE
-        // =========================
-
-        const historiqueAdmissions = depotsListe.map((depot) => ({
-            id: `admission-${depot.id}`,
-            date: depot.created_at || depot.date_arrivee,
-            type: "ADMISSION",
-            code:
-                depot.code ||
-                depot.code_defunt ||
-                "—",
-            defunt:
-                `${depot.nom || ""} ${depot.prenom || ""}`.trim() ||
-                "Sans nom",
-            detail: "Admission du défunt",
-            statut: "ENREGISTRÉ",
-        }));
-
-        const historiqueTransferts = transfertsListe.map(
-            (transfert) => {
-                const depot =
-                    transfert.depot || {};
-
-                return {
-                    id: `transfert-${transfert.id}`,
-                    date:
-                        transfert.updated_at ||
-                        transfert.created_at ||
-                        `${transfert.date || ""}T${
-                            transfert.heure || "00:00"
-                        }`,
-                    type: "TRANSFERT",
-                    code:
-                        depot.code ||
-                        depot.code_defunt ||
-                        "—",
-                    defunt:
-                        `${depot.nom || ""} ${
-                            depot.prenom || ""
-                        }`.trim() || "Sans nom",
-                    detail:
-                        transfert.type === "interne"
-                            ? `Transfert interne vers ${
-                                  transfert.emplacement_destination ||
-                                  "emplacement non précisé"
-                              }`
-                            : `Transfert externe vers ${
-                                  transfert.destination ||
-                                  "destination non précisée"
-                              }`,
-                    statut:
-                        transfert.statut ||
-                        "EN ATTENTE",
-                };
-            }
-        );
-
-        const historiqueSorties = sortiesListe.map((sortie) => {
-            const depot = sortie.depot || {};
-
-            return {
-                id: `sortie-${sortie.id}`,
-                date:
-                    sortie.updated_at ||
-                    sortie.created_at ||
-                    `${sortie.date || ""}T${
-                        sortie.heure || "00:00"
-                    }`,
-                type: "SORTIE",
-                code:
-                    depot.code ||
-                    depot.code_defunt ||
-                    sortie.code ||
-                    "—",
-                defunt:
-                    `${depot.nom || ""} ${
-                        depot.prenom || ""
-                    }`.trim() || "Sans nom",
-                detail: `Sortie récupérée par ${
-                    sortie.recuperateur || "récupérateur non précisé"
-                }`,
-                statut:
-                    sortie.statut ||
-                    "SORTI",
-            };
-        });
-
-        const historiqueComplet = [
-            ...historiqueAdmissions,
-            ...historiqueTransferts,
-            ...historiqueSorties,
-        ]
-            .sort((a, b) => {
-                return (
-                    new Date(b.date || 0) -
-                    new Date(a.date || 0)
-                );
-            })
-            .slice(0, 10);
-
-        setHistorique(historiqueComplet);
-    } catch (err) {
-        console.error("Erreur Dashboard :", err);
-
-        setError(
-            err.message ||
-                "Une erreur est survenue lors du chargement du tableau de bord."
-        );
-    } finally {
-        setLoading(false);
-    }
+    return `${jour}/${mois}/${annee}`;
 };
 
-    useEffect(() => {
-        chargerDonnees();
-    }, []);
+const formaterMontant = (valeur) =>
+    new Intl.NumberFormat("fr-FR", {
+        maximumFractionDigits: 0,
+    }).format(Number(valeur || 0));
 
-    const normaliserStatut = (valeur) => {
-        return String(valeur || "")
-            .trim()
-            .toUpperCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "");
-    };
+const formaterVariation = (valeur) => {
+    if (!valeur || valeur.variation === null) return null;
 
-    const depotsPresents = useMemo(() => {
-        return depots.filter((depot) => {
-            const statut = normaliserStatut(
-                depot.statut || depot.statut_actuel
-            );
+    const signe = valeur.variation >= 0 ? "+" : "−";
+    const pourcentage = Math.abs(valeur.variation).toLocaleString("fr-FR");
 
-            return statut === "PRESENT" || statut === "ENCORE PRESENT";
-        });
-    }, [depots]);
+    return `${signe} ${pourcentage} % vs mois dernier`;
+};
 
-    const nombrePresents = depotsPresents.length;
+const classeStatut = (statut) => {
+    const normalise = String(statut || "")
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
 
-    const nombreSorties = useMemo(() => {
-        return depots.filter((depot) => {
-            const statut = normaliserStatut(depot.statut);
+    if (normalise === "SORTI") return "status-badge status-sorti";
+    if (normalise === "TRANSFERE") return "status-badge status-transfere";
 
-            return (
-                statut === "SORTI" ||
-                statut === "SORTIE"
-            );
-        }).length;
-    }, [depots]);
+    return "status-badge status-present";
+};
 
-    const nombreTransferts = transferts.length;
+/* =========================================================
+   COMPOSANT
+========================================================= */
 
-    const nombreAdmissions = depots.length;
+function Dashboard() {
+    const navigate = useNavigate();
+    const { can } = useSession();
 
-    const placesOccupees = useMemo(() => {
-        return depotsPresents.filter(
-            (depot) => depot.emplacement
-        ).length;
-    }, [depotsPresents]);
+    const [donnees, setDonnees] = useState(null);
+    const [chargement, setChargement] = useState(true);
+    const [actualisation, setActualisation] = useState(false);
+    const [erreur, setErreur] = useState("");
 
-    const emplacements = useMemo(() => {
-        const compteur = {};
-
-        depotsPresents.forEach((depot) => {
-            const emplacement =
-                depot.emplacement || "Non affecté";
-
-            compteur[emplacement] =
-                (compteur[emplacement] || 0) + 1;
-        });
-
-        return Object.entries(compteur)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 6);
-    }, [depotsPresents]);
-
-    const dernieresAdmissions = useMemo(() => {
-        return [...depots]
-            .sort((a, b) => {
-                return (
-                    new Date(b.created_at || 0) -
-                    new Date(a.created_at || 0)
-                );
-            })
-            .slice(0, 5);
-    }, [depots]);
-
-    const dernieresSorties = useMemo(() => {
-        return [...sorties]
-            .sort((a, b) => {
-                const dateA = new Date(
-                    `${a.date || "1900-01-01"}T${a.heure || "00:00"}`
-                );
-
-                const dateB = new Date(
-                    `${b.date || "1900-01-01"}T${b.heure || "00:00"}`
-                );
-
-                return dateB - dateA;
-            })
-            .slice(0, 5);
-    }, [sorties]);
-
-    const flux = [
-        {
-            label: "Admissions",
-            value: nombreAdmissions,
-            className: "flux-admission",
-        },
-        {
-            label: "Présents",
-            value: nombrePresents,
-            className: "flux-present",
-        },
-        {
-            label: "Transferts",
-            value: nombreTransferts,
-            className: "flux-transfert",
-        },
-        {
-            label: "Sorties",
-            value: nombreSorties,
-            className: "flux-sortie",
-        },
-    ];
-
-    const getNomDefunt = (depot) => {
-        if (!depot) return "—";
-
-        return `${depot.nom || ""} ${depot.prenom || ""}`.trim() || "Sans nom";
-    };
-
-    const formaterDate = (date) => {
-        if (!date) return "—";
-
-        const d = new Date(date);
-
-        if (Number.isNaN(d.getTime())) {
-            return date;
+    const charger = async ({ silencieux = false } = {}) => {
+        if (silencieux) {
+            setActualisation(true);
+        } else {
+            setChargement(true);
         }
 
-        return d.toLocaleDateString("fr-FR", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-        });
+        setErreur("");
+
+        try {
+            setDonnees(await api.dashboard.get());
+        } catch (error) {
+            setErreur(
+                error?.firstMessage ||
+                    error?.message ||
+                    "Impossible de charger le tableau de bord."
+            );
+        } finally {
+            setChargement(false);
+            setActualisation(false);
+        }
     };
 
-    if (loading) {
+    useEffect(() => {
+        let annule = false;
+
+        api.dashboard
+            .get()
+            .then((data) => {
+                if (!annule) setDonnees(data);
+            })
+            .catch((error) => {
+                if (annule) return;
+                setErreur(
+                    error?.firstMessage ||
+                        error?.message ||
+                        "Impossible de charger le tableau de bord."
+                );
+            })
+            .finally(() => {
+                if (!annule) setChargement(false);
+            });
+
+        return () => {
+            annule = true;
+        };
+    }, []);
+
+    if (chargement) {
         return (
             <div className="dashboard-page">
                 <div className="dashboard-loading">
@@ -288,44 +123,152 @@ function Dashboard() {
         );
     }
 
+    if (!donnees) {
+        return (
+            <div className="dashboard-page">
+                <div className="dashboard-header">
+                    <div>
+                        <h1>Tableau de bord</h1>
+                    </div>
+
+                    <button
+                        className="refresh-button"
+                        onClick={() => charger()}
+                    >
+                        ↻ Réessayer
+                    </button>
+                </div>
+
+                <div className="dashboard-error">
+                    <strong>Erreur :</strong>{" "}
+                    {erreur || "Aucune donnée disponible."}
+                </div>
+            </div>
+        );
+    }
+
+    const compteurs = donnees.compteurs || {};
+    const tendances = donnees.tendances || {};
+    const occupation = donnees.occupation;
+    const totauxOccupation = occupation?.totaux;
+    const alertes = donnees.alertes || {};
+    const impayes = alertes.impayes;
+    const nonAttribues = alertes.non_attribues;
+    const scelles = alertes.scelles;
+    const finance = donnees.finance;
+    const admissions = donnees.dernieres_admissions || [];
+    const sorties = donnees.dernieres_sorties || [];
+
+    const heureMaj = donnees.genere_le
+        ? new Date(donnees.genere_le).toLocaleTimeString("fr-FR", {
+              hour: "2-digit",
+              minute: "2-digit",
+          })
+        : null;
+
+    const dateDuJour = new Date().toLocaleDateString("fr-FR", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+    });
+
+    const tendanceAdmissions = formaterVariation(tendances.admissions);
+    const tendanceSorties = formaterVariation(tendances.sorties);
+
+    const actions = [
+        {
+            permission: "depots.create",
+            icone: "+",
+            titre: "Nouvelle admission",
+            detail: "Enregistrer un défunt",
+            lien: "/DepotCorps?nouveau=1",
+        },
+        {
+            permission: "transferts.create",
+            icone: "⇄",
+            titre: "Nouveau transfert",
+            detail: "Transférer un défunt",
+            lien: "/transfert?nouveau=1",
+        },
+        {
+            permission: "sorties.create",
+            icone: "✓",
+            titre: "Nouvelle sortie",
+            detail: "Enregistrer une sortie",
+            lien: "/Sortie?nouveau=1",
+        },
+        {
+            permission: "declarations.create",
+            icone: "▤",
+            titre: "Nouvelle déclaration",
+            detail: "Déclaration de décès",
+            lien: "/declarations?nouveau=1",
+        },
+        {
+            permission: "emplacements.view",
+            icone: "▦",
+            titre: "Plan d'occupation",
+            detail: "Chambres froides et caissons",
+            lien: "/Emplacements",
+        },
+        {
+            permission: "statistiques.view",
+            icone: "▥",
+            titre: "Statistiques",
+            detail: "Consulter les rapports",
+            lien: "/Statistiques",
+        },
+    ].filter((action) => can(action.permission));
+
+    const ouvrirDepot = (id) => {
+        if (!id) return;
+        navigate(`/DepotCorps?depot=${id}`);
+    };
+
     return (
         <div className="dashboard-page">
-
             {/* EN-TÊTE */}
             <div className="dashboard-header">
                 <div>
                     <h1>Tableau de bord</h1>
-
+                    <p>
+                        Vue d'ensemble au {dateDuJour}
+                        {heureMaj ? ` · actualisé à ${heureMaj}` : ""}
+                    </p>
                 </div>
 
                 <button
                     className="refresh-button"
-                    onClick={chargerDonnees}
+                    onClick={() => charger({ silencieux: true })}
+                    disabled={actualisation}
                 >
-                    ↻ Actualiser
+                    {actualisation ? "Actualisation…" : "↻ Actualiser"}
                 </button>
             </div>
 
             {/* ERREUR */}
-            {error && (
+            {erreur && (
                 <div className="dashboard-error">
-                    <strong>Erreur :</strong> {error}
-                    <button onClick={chargerDonnees}>
-                        Réessayer
-                    </button>
+                    <strong>Erreur :</strong> {erreur}
+                    <button onClick={() => charger()}>Réessayer</button>
                 </div>
             )}
 
             {/* CARTES PRINCIPALES */}
             <div className="dashboard-cards">
-
                 <div className="dashboard-card card-purple">
                     <div className="card-icon">♙</div>
 
                     <div className="card-content">
                         <span>Défunts présents</span>
-                        <strong>{nombrePresents}</strong>
-                        <small>Actuellement en conservation</small>
+                        <strong>{compteurs.presents ?? 0}</strong>
+                        <small>
+                            {compteurs.scelles === null ||
+                            compteurs.scelles === undefined
+                                ? "Actuellement en conservation"
+                                : `${compteurs.scelles} scellé(s)`}
+                        </small>
                     </div>
                 </div>
 
@@ -334,8 +277,23 @@ function Dashboard() {
 
                     <div className="card-content">
                         <span>Admissions</span>
-                        <strong>{nombreAdmissions}</strong>
-                        <small>Total des dossiers enregistrés</small>
+                        <strong>{compteurs.admissions ?? 0}</strong>
+                        <small>
+                            {compteurs.admissions_aujourdhui ?? 0} aujourd'hui
+                            {" · "}
+                            {compteurs.admissions_mois ?? 0} ce mois
+                        </small>
+                        {tendanceAdmissions && (
+                            <em
+                                className={`kpi-tendance ${
+                                    (tendances.admissions?.variation ?? 0) >= 0
+                                        ? "hausse"
+                                        : "baisse"
+                                }`}
+                            >
+                                {tendanceAdmissions}
+                            </em>
+                        )}
                     </div>
                 </div>
 
@@ -344,8 +302,23 @@ function Dashboard() {
 
                     <div className="card-content">
                         <span>Sorties</span>
-                        <strong>{nombreSorties}</strong>
-                        <small>Défunts sortis</small>
+                        <strong>{compteurs.sorties ?? 0}</strong>
+                        <small>
+                            {compteurs.sorties_aujourdhui ?? 0} aujourd'hui
+                            {" · "}
+                            {compteurs.sorties_mois ?? 0} ce mois
+                        </small>
+                        {tendanceSorties && (
+                            <em
+                                className={`kpi-tendance ${
+                                    (tendances.sorties?.variation ?? 0) >= 0
+                                        ? "hausse"
+                                        : "baisse"
+                                }`}
+                            >
+                                {tendanceSorties}
+                            </em>
+                        )}
                     </div>
                 </div>
 
@@ -354,107 +327,256 @@ function Dashboard() {
 
                     <div className="card-content">
                         <span>Transferts</span>
-                        <strong>{nombreTransferts}</strong>
-                        <small>Transferts enregistrés</small>
+                        <strong>{compteurs.transferts ?? 0}</strong>
+                        <small>
+                            {compteurs.transferts_mois ?? 0} ce mois
+                        </small>
                     </div>
                 </div>
 
+                <div className="dashboard-card card-teal">
+                    <div className="card-icon">▦</div>
+
+                    <div className="card-content">
+                        <span>Occupation</span>
+                        <strong>
+                            {totauxOccupation
+                                ? `${totauxOccupation.taux} %`
+                                : "—"}
+                        </strong>
+                        <small>
+                            {totauxOccupation
+                                ? `${totauxOccupation.occupes} / ${totauxOccupation.actifs} caissons actifs`
+                                : "Permission emplacements requise"}
+                        </small>
+                    </div>
+                </div>
+
+                <div className="dashboard-card card-red">
+                    <div className="card-icon">₣</div>
+
+                    <div className="card-content">
+                        <span>Reste à recouvrer</span>
+                        <strong>
+                            {impayes ? formaterMontant(impayes.montant) : "—"}
+                        </strong>
+                        <small>
+                            {impayes
+                                ? `${impayes.total} non soldée(s)${
+                                      finance
+                                          ? ` · ${formaterMontant(
+                                                finance.mois.paye
+                                            )} encaissé(s) ce mois`
+                                          : ""
+                                  }`
+                                : "Permission sorties requise"}
+                        </small>
+                    </div>
+                </div>
             </div>
 
-            {/* FLUX + PLACES */}
-            <div className="dashboard-grid">
-
+            {/* COURBE + OCCUPATION */}
+            <div className="dashboard-grid dashboard-grid-large">
                 <section className="dashboard-panel">
-
                     <div className="panel-header">
                         <div>
-                            <h2>Flux des dossiers</h2>
-                            <p>Situation actuelle</p>
+                            <h2>Flux des 14 derniers jours</h2>
+                            <p>Admissions et sorties enregistrées par jour</p>
+                        </div>
+
+                        <div className="chart-legende">
+                            <span>
+                                <i className="chart-puce chart-puce-admission" />
+                                Admissions
+                            </span>
+                            <span>
+                                <i className="chart-puce chart-puce-sortie" />
+                                Sorties
+                            </span>
                         </div>
                     </div>
 
-                    <div className="flux-list">
-
-                        {flux.map((item) => (
-                            <div
-                                className="flux-item"
-                                key={item.label}
-                            >
-                                <div className="flux-label">
-                                    <span
-                                        className={`flux-dot ${item.className}`}
-                                    ></span>
-
-                                    <span>{item.label}</span>
-                                </div>
-
-                                <strong>{item.value}</strong>
-                            </div>
-                        ))}
-
+                    <div className="chart-conteneur">
+                        <CourbeFlux points={donnees.serie?.points || []} />
                     </div>
-
                 </section>
 
                 <section className="dashboard-panel">
-
                     <div className="panel-header">
                         <div>
                             <h2>Occupation</h2>
-                            <p>Emplacements actuellement occupés</p>
+                            <p>Caissons actifs des chambres froides</p>
                         </div>
                     </div>
 
-                    <div className="occupation-number">
-                        <strong>{placesOccupees}</strong>
-                        <span>emplacements occupés</span>
-                    </div>
+                    {occupation ? (
+                        <div className="occupation-contenu">
+                            <DonutOccupation
+                                occupes={totauxOccupation.occupes}
+                                actifs={totauxOccupation.actifs}
+                                taux={totauxOccupation.taux}
+                            />
 
-                    <div className="occupation-list">
-
-                        {emplacements.length === 0 ? (
-                            <div className="empty-state">
-                                Aucun emplacement occupé.
-                            </div>
-                        ) : (
-                            emplacements.map(
-                                ([nom, nombre]) => (
-                                    <div
-                                        className="occupation-row"
-                                        key={nom}
-                                    >
-                                        <div className="occupation-name">
-                                            <span>{nom}</span>
-                                            <strong>{nombre}</strong>
-                                        </div>
-
-                                        <div className="progress">
-                                            <div
-                                                className="progress-bar"
-                                                style={{
-                                                    width: `${Math.min(
-                                                        nombre * 20,
-                                                        100
-                                                    )}%`,
-                                                }}
-                                            ></div>
-                                        </div>
+                            <div className="chambres-liste">
+                                {occupation.chambres.length === 0 ? (
+                                    <div className="empty-state">
+                                        Aucune chambre froide enregistrée.
                                     </div>
-                                )
-                            )
-                        )}
+                                ) : (
+                                    occupation.chambres.map((chambre) => (
+                                        <div
+                                            className="chambre-row"
+                                            key={chambre.id}
+                                        >
+                                            <div className="chambre-entete">
+                                                <span>
+                                                    {chambre.nom}
+                                                    {!chambre.actif && (
+                                                        <em>inactive</em>
+                                                    )}
+                                                </span>
+                                                <small>
+                                                    {chambre.caissons_actifs >
+                                                    0
+                                                        ? `${chambre.occupes}/${chambre.caissons_actifs}`
+                                                        : "inactive"}
+                                                </small>
+                                            </div>
 
-                    </div>
-
+                                            <div className="progress">
+                                                <div
+                                                    className="progress-bar progress-bar-occupation"
+                                                    style={{
+                                                        width: `${Math.min(
+                                                            100,
+                                                            chambre.taux
+                                                        )}%`,
+                                                    }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="empty-state">
+                            Activez la permission « emplacements.view » pour
+                            afficher l'occupation des caissons.
+                        </div>
+                    )}
                 </section>
-
             </div>
 
-            {/* DERNIÈRES ADMISSIONS + SORTIES */}
+            {/* ALERTES + DERNIÈRES ADMISSIONS */}
             <div className="dashboard-grid">
+                <section className="dashboard-panel">
+                    <div className="panel-header">
+                        <div>
+                            <h2>Alertes</h2>
+                            <p>Points à traiter en priorité</p>
+                        </div>
+                    </div>
+
+                    <div className="alertes-liste">
+                        {nonAttribues && (
+                            <div className="alerte alerte-warn">
+                                <div className="alerte-entete">
+                                    <strong>Corps sans caisson</strong>
+                                    <span>{nonAttribues.total}</span>
+                                </div>
+
+                                {nonAttribues.corps.length === 0 ? (
+                                    <p className="alerte-vide">
+                                        Tous les corps présents sont
+                                        attribués.
+                                    </p>
+                                ) : (
+                                    nonAttribues.corps.map((corps) => (
+                                        <button
+                                            type="button"
+                                            className="alerte-lien"
+                                            key={corps.id}
+                                            onClick={() =>
+                                                ouvrirDepot(corps.id)
+                                            }
+                                        >
+                                            <span>
+                                                {corps.code} ·{" "}
+                                                {nomDefunt(corps)}
+                                            </span>
+                                            <small>
+                                                arrivé le{" "}
+                                                {dateCourte(
+                                                    corps.date_arrivee
+                                                )}
+                                            </small>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        )}
+
+                        {impayes && (
+                            <div className="alerte alerte-danger">
+                                <div className="alerte-entete">
+                                    <strong>Sorties non soldées</strong>
+                                    <span>{impayes.total}</span>
+                                </div>
+
+                                {impayes.sorties.length === 0 ? (
+                                    <p className="alerte-vide">
+                                        Aucun impayé enregistré.
+                                    </p>
+                                ) : (
+                                    impayes.sorties.map((sortie) => (
+                                        <button
+                                            type="button"
+                                            className="alerte-lien"
+                                            key={sortie.id}
+                                            onClick={() =>
+                                                ouvrirDepot(sortie.depot_id)
+                                            }
+                                        >
+                                            <span>
+                                                {sortie.code} ·{" "}
+                                                {nomDefunt(sortie)}
+                                            </span>
+                                            <small>
+                                                {formaterMontant(
+                                                    sortie.reste_a_payer
+                                                )}{" "}
+                                                à recouvrer
+                                            </small>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        )}
+
+                        {scelles && (
+                            <div className="alerte alerte-info">
+                                <div className="alerte-entete">
+                                    <strong>Corps scellés</strong>
+                                    <span>{scelles.total}</span>
+                                </div>
+
+                                <p className="alerte-vide">
+                                    Ces corps ne peuvent plus être déplacés ni
+                                    sortis tant qu'ils restent scellés.
+                                </p>
+                            </div>
+                        )}
+
+                        {!nonAttribues && !impayes && !scelles && (
+                            <div className="empty-state">
+                                Aucune alerte disponible avec vos permissions.
+                            </div>
+                        )}
+                    </div>
+                </section>
 
                 <section className="dashboard-panel">
-
                     <div className="panel-header">
                         <div>
                             <h2>Dernières admissions</h2>
@@ -462,231 +584,225 @@ function Dashboard() {
                         </div>
 
                         <span className="panel-count">
-                            {depots.length}
+                            {compteurs.admissions ?? 0}
                         </span>
                     </div>
 
                     <div className="table-container">
-
-                        {dernieresAdmissions.length === 0 ? (
+                        {admissions.length === 0 ? (
                             <div className="empty-state">
                                 Aucune admission.
                             </div>
                         ) : (
                             <table className="dashboard-table">
-
                                 <thead>
                                     <tr>
                                         <th>CODE</th>
                                         <th>DÉFUNT</th>
-                                        <th>DATE</th>
+                                        <th>ARRIVÉE</th>
+                                        <th>CAISSON</th>
                                         <th>STATUT</th>
                                     </tr>
                                 </thead>
 
                                 <tbody>
-                                    {dernieresAdmissions.map(
-                                        (depot) => (
-                                            <tr key={depot.id}>
+                                    {admissions.map((depot) => (
+                                        <tr
+                                            key={depot.id}
+                                            className="ligne-cliquable"
+                                            tabIndex={0}
+                                            role="button"
+                                            onClick={() =>
+                                                ouvrirDepot(depot.id)
+                                            }
+                                            onKeyDown={(event) => {
+                                                if (
+                                                    event.key === "Enter" ||
+                                                    event.key === " "
+                                                ) {
+                                                    event.preventDefault();
+                                                    ouvrirDepot(depot.id);
+                                                }
+                                            }}
+                                        >
+                                            <td>
+                                                <span className="code-badge">
+                                                    {depot.code ||
+                                                        depot.code_defunt ||
+                                                        "—"}
+                                                </span>
+                                            </td>
 
-                                                <td>
-                                                    <span className="code-badge">
-                                                        {depot.code ||
-                                                            depot.code_defunt ||
-                                                            "—"}
+                                            <td>
+                                                <strong>
+                                                    {nomDefunt(depot)}
+                                                </strong>
+                                                {depot.scelle && (
+                                                    <span className="badge-scelle">
+                                                        scellé
                                                     </span>
-                                                </td>
+                                                )}
+                                            </td>
 
-                                                <td>
-                                                    <strong>
-                                                        {getNomDefunt(
-                                                            depot
-                                                        )}
-                                                    </strong>
-                                                </td>
+                                            <td>
+                                                {dateCourte(
+                                                    depot.date_arrivee
+                                                )}
+                                            </td>
 
-                                                <td>
-                                                    {formaterDate(
-                                                        depot.date_arrivee ||
-                                                            depot.created_at
+                                            <td>
+                                                {depot.caisson
+                                                    ? `${depot.caisson}${
+                                                          depot.chambre
+                                                              ? ` · ${depot.chambre}`
+                                                              : ""
+                                                      }`
+                                                    : "Non attribué"}
+                                            </td>
+
+                                            <td>
+                                                <span
+                                                    className={classeStatut(
+                                                        depot.statut
                                                     )}
-                                                </td>
-
-                                                <td>
-                                                    <span
-                                                        className={
-                                                            normaliserStatut(
-                                                                depot.statut
-                                                            ).includes(
-                                                                "SORTI"
-                                                            )
-                                                                ? "status-badge status-sorti"
-                                                                : "status-badge status-present"
-                                                        }
-                                                    >
-                                                        {depot.statut ||
-                                                            "—"}
-                                                    </span>
-                                                </td>
-
-                                            </tr>
-                                        )
-                                    )}
+                                                >
+                                                    {depot.statut || "—"}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
-
                             </table>
                         )}
-
                     </div>
-
                 </section>
-
-                <section className="dashboard-panel">
-
-                    <div className="panel-header">
-                        <div>
-                            <h2>Dernières sorties</h2>
-                            <p>Les sorties les plus récentes</p>
-                        </div>
-
-                        <span className="panel-count">
-                            {sorties.length}
-                        </span>
-                    </div>
-
-                    <div className="table-container">
-
-                        {dernieresSorties.length === 0 ? (
-                            <div className="empty-state">
-                                Aucune sortie enregistrée.
-                            </div>
-                        ) : (
-                            <table className="dashboard-table">
-
-                                <thead>
-                                    <tr>
-                                        <th>DATE</th>
-                                        <th>DÉFUNT</th>
-                                        <th>RÉCUPÉRATEUR</th>
-                                        <th>STATUT</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody>
-                                    {dernieresSorties.map(
-                                        (sortie) => {
-
-                                            const depot =
-                                                sortie.depot;
-
-                                            return (
-                                                <tr key={sortie.id}>
-
-                                                    <td>
-                                                        {formaterDate(
-                                                            sortie.date
-                                                        )}
-                                                    </td>
-
-                                                    <td>
-                                                        <strong>
-                                                            {getNomDefunt(
-                                                                depot
-                                                            )}
-                                                        </strong>
-                                                    </td>
-
-                                                    <td>
-                                                        {sortie.recuperateur ||
-                                                            "—"}
-                                                    </td>
-
-                                                    <td>
-                                                        <span className="status-badge status-sortie">
-                                                            {sortie.statut ||
-                                                                "SORTI"}
-                                                        </span>
-                                                    </td>
-
-                                                </tr>
-                                            );
-                                        }
-                                    )}
-                                </tbody>
-
-                            </table>
-                        )}
-
-                    </div>
-
-                </section>
-
             </div>
 
-            {/* INFORMATIONS RAPIDES */}
-            <section className="quick-actions">
-
-                <div className="quick-action-header">
+            {/* DERNIÈRES SORTIES */}
+            <section className="dashboard-panel dashboard-panel-sorties">
+                <div className="panel-header">
                     <div>
-                        <h2>Actions rapides</h2>
+                        <h2>Dernières sorties</h2>
+                        <p>Les sorties les plus récentes</p>
                     </div>
+
+                    <span className="panel-count">
+                        {compteurs.sorties ?? 0}
+                    </span>
                 </div>
 
-                <div className="quick-action-grid">
-
-                    <button
-                        onClick={() =>
-                            window.location.href = "/depots"
-                        }
-                    >
-                        <span>+</span>
-                        <div>
-                            <strong>Nouvelle admission</strong>
-                            <small>Enregistrer un défunt</small>
+                <div className="table-container">
+                    {sorties.length === 0 ? (
+                        <div className="empty-state">
+                            Aucune sortie enregistrée.
                         </div>
-                    </button>
+                    ) : (
+                        <table className="dashboard-table">
+                            <thead>
+                                <tr>
+                                    <th>DATE</th>
+                                    <th>DÉFUNT</th>
+                                    <th>RÉCUPÉRATEUR</th>
+                                    <th>MONTANT</th>
+                                    <th>RESTE</th>
+                                    <th>STATUT</th>
+                                </tr>
+                            </thead>
 
-                    <button
-                        onClick={() =>
-                            window.location.href = "/transferts"
-                        }
-                    >
-                        <span>⇄</span>
-                        <div>
-                            <strong>Nouveau transfert</strong>
-                            <small>Transférer un défunt</small>
-                        </div>
-                    </button>
+                            <tbody>
+                                {sorties.map((sortie) => (
+                                    <tr
+                                        key={sortie.id}
+                                        className="ligne-cliquable"
+                                        tabIndex={0}
+                                        role="button"
+                                        onClick={() =>
+                                            ouvrirDepot(sortie.depot_id)
+                                        }
+                                        onKeyDown={(event) => {
+                                            if (
+                                                event.key === "Enter" ||
+                                                event.key === " "
+                                            ) {
+                                                event.preventDefault();
+                                                ouvrirDepot(sortie.depot_id);
+                                            }
+                                        }}
+                                    >
+                                        <td>
+                                            {dateCourte(sortie.date)}
+                                            {sortie.heure
+                                                ? ` · ${sortie.heure}`
+                                                : ""}
+                                        </td>
 
-                    <button
-                        onClick={() =>
-                            window.location.href = "/sorties"
-                        }
-                    >
-                        <span>✓</span>
-                        <div>
-                            <strong>Nouvelle sortie</strong>
-                            <small>Enregistrer une sortie</small>
-                        </div>
-                    </button>
+                                        <td>
+                                            <strong>
+                                                {nomDefunt(sortie)}
+                                            </strong>
+                                        </td>
 
-                    <button
-                        onClick={() =>
-                            window.location.href = "/statistiques"
-                        }
-                    >
-                        <span>▥</span>
-                        <div>
-                            <strong>Statistiques</strong>
-                            <small>Consulter les rapports</small>
-                        </div>
-                    </button>
+                                        <td>
+                                            {sortie.recuperateur || "—"}
+                                        </td>
 
+                                        <td>
+                                            {formaterMontant(
+                                                sortie.montant_total
+                                            )}
+                                        </td>
+
+                                        <td>
+                                            {sortie.reste_a_payer > 0 ? (
+                                                <span className="reste-du">
+                                                    {formaterMontant(
+                                                        sortie.reste_a_payer
+                                                    )}
+                                                </span>
+                                            ) : (
+                                                "—"
+                                            )}
+                                        </td>
+
+                                        <td>
+                                            <span className="status-badge status-sorti">
+                                                {sortie.statut || "SORTI"}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
-
-
             </section>
 
+            {/* ACTIONS RAPIDES */}
+            {actions.length > 0 && (
+                <section className="quick-actions">
+                    <div className="quick-action-header">
+                        <div>
+                            <h2>Actions rapides</h2>
+                        </div>
+                    </div>
+
+                    <div className="quick-action-grid">
+                        {actions.map((action) => (
+                            <button
+                                key={action.titre}
+                                type="button"
+                                onClick={() => navigate(action.lien)}
+                            >
+                                <span>{action.icone}</span>
+                                <div>
+                                    <strong>{action.titre}</strong>
+                                    <small>{action.detail}</small>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </section>
+            )}
         </div>
     );
 }

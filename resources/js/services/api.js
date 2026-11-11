@@ -49,9 +49,11 @@ export const auth = {
 export const depots = {
     ...ressource("depots"),
     disponibles: () => get("/depots-disponibles"),
-        assignBox: (id, box_name) => put(`/depots/${id}/box`, { box_name }),
-sceller: (id) => put(`/depots/${id}/sceller`, {}),
-desceller: (id) => put(`/depots/${id}/desceller`, {}),
+    caissonsDisponibles: (depotId) =>
+        get("/caissons-disponibles", depotId ? { depot_id: depotId } : undefined),
+    assignBox: (id, caisson_id) => put(`/depots/${id}/box`, { caisson_id }),
+    sceller: (id) => put(`/depots/${id}/sceller`, {}),
+    desceller: (id) => put(`/depots/${id}/desceller`, {}),
 };
 
 export const sorties = {
@@ -61,6 +63,14 @@ export const sorties = {
 };
 
 export const transferts = ressource("transferts");
+
+export const dashboard = {
+    get: () => get("/dashboard"),
+};
+
+export const recherche = {
+    globale: (texte, config) => get("/recherche", { q: texte }, config),
+};
 
 export const levees = {
     list: (params) => get("/levees", params),
@@ -101,6 +111,23 @@ export const services = {
     remove: (id) => del(`/services/${id}`),
 };
 
+/* ---------------- EMPLACEMENTS (chambres froides & caissons) ---------------- */
+export const emplacements = {
+    plan: () => get("/emplacements/plan"),
+    chambres: {
+        list: () => get("/chambres-froides"),
+        create: (donnees) => post("/chambres-froides", donnees),
+        update: (id, donnees) => put(`/chambres-froides/${id}`, donnees),
+        toggleActif: (id) => put(`/chambres-froides/${id}/actif`, {}),
+        ajouterCaisson: (id, code) =>
+            post(`/chambres-froides/${id}/caissons`, { code }),
+    },
+    caissons: {
+        update: (id, donnees) => put(`/caissons/${id}`, donnees),
+        toggleActif: (id) => put(`/caissons/${id}/actif`, {}),
+    },
+};
+
 /* ---------------- ADMINISTRATION ---------------- */
 export const utilisateurs = {
     ...ressource("utilisateurs"),
@@ -127,6 +154,8 @@ const api = {
     depots,
     sorties,
     transferts,
+    dashboard,
+    recherche,
     levees,
     declarations,
     statistiques,
@@ -134,6 +163,7 @@ const api = {
     chapelles,
     professions,
     services,
+    emplacements,
     utilisateurs,
     roles,
     permissions,

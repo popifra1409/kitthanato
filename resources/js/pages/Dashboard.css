@@ -73,7 +73,7 @@
 
 .dashboard-cards {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 18px;
     margin-bottom: 22px;
 }
@@ -120,6 +120,16 @@
     color: #d17a18;
 }
 
+.card-teal .card-icon {
+    background: #e2f6f6;
+    color: #0f7f86;
+}
+
+.card-red .card-icon {
+    background: #fdeaea;
+    color: #b93d3d;
+}
+
 .card-content {
     display: flex;
     flex-direction: column;
@@ -141,6 +151,21 @@
     color: #9a94a2;
     font-size: 11px;
     margin-top: 2px;
+}
+
+.kpi-tendance {
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.kpi-tendance.hausse {
+    color: #238453;
+}
+
+.kpi-tendance.baisse {
+    color: #b93d3d;
 }
 
 /*  GRID */
@@ -366,7 +391,24 @@
     white-space: nowrap;
 }
 
+/* Spécificité renforcée : les pages Dépôts/Sorties définissent aussi
+   .status-present / .status-sorti et sont chargées après ce fichier. */
+.dashboard-table .status-badge {
+    display: inline-flex;
+    padding: 5px 9px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+    min-width: 0;
+}
+
 .status-present {
+    background: #e7f7ef;
+    color: #238453;
+}
+
+.dashboard-table .status-present {
     background: #e7f7ef;
     color: #238453;
 }
@@ -374,6 +416,16 @@
 .status-sorti {
     background: #f3edf4;
     color: #756477;
+}
+
+.dashboard-table .status-sorti {
+    background: #f3edf4;
+    color: #756477;
+}
+
+.dashboard-table .status-transfere {
+    background: #e7f0ff;
+    color: #2f5fa8;
 }
 
 /* EMPTY*/
@@ -512,5 +564,497 @@
 
     .dashboard-header h1 {
         font-size: 25px;
+    }
+}
+/* =========================================================
+   COURBES ET SYNTHÈSE
+========================================================= */
+
+.dashboard-grid-large {
+    grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+}
+
+.dashboard-panel-sorties {
+    margin-bottom: 20px;
+}
+
+.chart-conteneur {
+    padding: 14px 16px 10px;
+}
+
+.chart-courbe {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.chart-grille {
+    stroke: #eeeaf3;
+    stroke-width: 1;
+}
+
+.chart-axe {
+    fill: #9a94a2;
+    font-size: 11px;
+}
+
+.chart-ligne {
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.chart-ligne-admission {
+    stroke: #3976c8;
+}
+
+.chart-ligne-sortie {
+    stroke: #26935e;
+}
+
+.chart-aire {
+    stroke: none;
+}
+
+.chart-aire-admission {
+    fill: #3976c8;
+    opacity: 0.1;
+}
+
+.chart-aire-sortie {
+    fill: #26935e;
+    opacity: 0.1;
+}
+
+.chart-point-admission {
+    fill: #3976c8;
+}
+
+.chart-point-sortie {
+    fill: #26935e;
+}
+
+.chart-legende {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 12px;
+    color: #6b6475;
+}
+
+.chart-puce {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.chart-puce-admission {
+    background: #3976c8;
+}
+
+.chart-puce-sortie {
+    background: #26935e;
+}
+
+.chart-vide {
+    padding: 45px 20px;
+    text-align: center;
+    color: #9b95a3;
+    font-size: 13px;
+}
+
+/* =========================================================
+   OCCUPATION (anneau + chambres)
+========================================================= */
+
+.occupation-contenu {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 18px 20px 20px;
+}
+
+.donut {
+    width: 150px;
+    max-width: 100%;
+    align-self: center;
+}
+
+.donut-fond {
+    fill: none;
+    stroke: #eeeaf3;
+    stroke-width: 14;
+}
+
+.donut-valeur {
+    fill: none;
+    stroke: #6f42c1;
+    stroke-width: 14;
+    stroke-linecap: round;
+    transition: stroke-dasharray 0.4s ease;
+}
+
+.donut-taux {
+    fill: #302b39;
+    font-size: 26px;
+    font-weight: 750;
+}
+
+.donut-legende {
+    fill: #8f889b;
+    font-size: 11px;
+}
+
+.chambres-liste {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.chambre-row .chambre-entete {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 5px;
+    font-size: 12px;
+    color: #655e6d;
+}
+
+.chambre-row .chambre-entete span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chambre-row .chambre-entete em {
+    font-style: normal;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #9a94a2;
+    margin-left: 7px;
+}
+
+.chambre-row .chambre-entete small {
+    color: #3d3745;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.progress-bar-occupation {
+    background: #0f7f86;
+}
+
+/* =========================================================
+   ALERTES
+========================================================= */
+
+.alertes-liste {
+    padding: 16px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.alerte {
+    border: 1px solid #eeeaf3;
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: #fcfbfd;
+}
+
+.alerte-warn {
+    border-color: #f0d7a8;
+    background: #fffaf0;
+}
+
+.alerte-danger {
+    border-color: #f0c1c1;
+    background: #fff6f6;
+}
+
+.alerte-info {
+    border-color: #cfe1f7;
+    background: #f5f9ff;
+}
+
+.alerte-entete {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: #3d3745;
+}
+
+.alerte-entete span {
+    background: rgba(35, 23, 55, 0.08);
+    border-radius: 20px;
+    padding: 2px 9px;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.alerte-vide {
+    margin: 0;
+    font-size: 12px;
+    color: #8b8496;
+    line-height: 1.45;
+}
+
+.alerte-lien {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    border-top: 1px dashed rgba(35, 23, 55, 0.12);
+    padding: 7px 0 4px;
+    cursor: pointer;
+    color: #4c4654;
+    font-size: 12px;
+}
+
+.alerte-entete + .alerte-lien {
+    border-top: none;
+}
+
+.alerte-lien:hover span,
+.alerte-lien:focus-visible span {
+    color: #6f42c1;
+    text-decoration: underline;
+}
+
+.alerte-lien small {
+    color: #8b8496;
+}
+
+/* =========================================================
+   TABLES INTERACTIVES ET BADGES
+========================================================= */
+
+.ligne-cliquable {
+    cursor: pointer;
+}
+
+.ligne-cliquable:hover,
+.ligne-cliquable:focus-visible {
+    background: #f8f4ff;
+    outline: none;
+}
+
+.dashboard-panel-sorties .dashboard-table {
+    min-width: 680px;
+}
+
+.badge-scelle {
+    margin-left: 7px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    background: #fdf1d8;
+    color: #9a6410;
+    border-radius: 20px;
+    padding: 2px 7px;
+    vertical-align: middle;
+}
+
+.status-transfere {
+    background: #e7f0ff;
+    color: #2f5fa8;
+}
+
+.reste-du {
+    color: #b93d3d;
+    font-weight: 700;
+}
+
+/* =========================================================
+   MODE SOMBRE
+========================================================= */
+
+body.dark-mode .dashboard-page {
+    background: #0f0a1a;
+    color: #e8e0f0;
+}
+
+body.dark-mode .dashboard-header h1,
+body.dark-mode .card-content strong,
+body.dark-mode .panel-header h2,
+body.dark-mode .quick-action-header h2,
+body.dark-mode .dashboard-table td strong,
+body.dark-mode .alerte-entete,
+body.dark-mode .chambre-row .chambre-entete small,
+body.dark-mode .donut-taux,
+body.dark-mode .quick-action-grid strong {
+    color: #e8e0f0;
+}
+
+body.dark-mode .dashboard-card,
+body.dark-mode .dashboard-panel,
+body.dark-mode .quick-actions {
+    background: #241a33;
+    border-color: #342548;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+}
+
+body.dark-mode .panel-header,
+body.dark-mode .quick-action-header,
+body.dark-mode .dashboard-table td {
+    border-color: #2a1f3d;
+}
+
+body.dark-mode .dashboard-table th {
+    background: #1a1226;
+    color: #8b7ba0;
+}
+
+body.dark-mode .dashboard-table td,
+body.dark-mode .panel-header p,
+body.dark-mode .quick-action-header p,
+body.dark-mode .card-content span,
+body.dark-mode .card-content small,
+body.dark-mode .chart-legende,
+body.dark-mode .chambre-row .chambre-entete {
+    color: #a89ab8;
+}
+
+body.dark-mode .ligne-cliquable:hover,
+body.dark-mode .ligne-cliquable:focus-visible {
+    background: #2a1a3d;
+}
+
+body.dark-mode .chart-grille {
+    stroke: #2a1f3d;
+}
+
+body.dark-mode .chart-axe {
+    fill: #8b7ba0;
+}
+
+body.dark-mode .donut-fond {
+    stroke: #2a1f3d;
+}
+
+body.dark-mode .donut-valeur {
+    stroke: #a78bfa;
+}
+
+body.dark-mode .donut-legende,
+body.dark-mode .chart-vide,
+body.dark-mode .empty-state,
+body.dark-mode .alerte-vide,
+body.dark-mode .alerte-lien small {
+    fill: #8b7ba0;
+    color: #8b7ba0;
+}
+
+body.dark-mode .alerte {
+    background: #1a1226;
+    border-color: #342548;
+}
+
+body.dark-mode .alerte-warn {
+    background: #2a2110;
+    border-color: #5a4318;
+}
+
+body.dark-mode .alerte-danger {
+    background: #2a1010;
+    border-color: #5a2020;
+}
+
+body.dark-mode .alerte-info {
+    background: #10202f;
+    border-color: #23405c;
+}
+
+body.dark-mode .alerte-entete span {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+body.dark-mode .alerte-lien {
+    color: #a89ab8;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .code-badge {
+    background: #2a1a3d;
+    color: #c4b5fd;
+}
+
+body.dark-mode .status-present {
+    background: #14301f;
+    color: #4ade80;
+}
+
+body.dark-mode .status-sorti {
+    background: #241a33;
+    color: #a89ab8;
+}
+
+body.dark-mode .status-transfere {
+    background: #10243a;
+    color: #60a5fa;
+}
+
+body.dark-mode .badge-scelle {
+    background: #3a2a10;
+    color: #f0c75e;
+}
+
+body.dark-mode .reste-du {
+    color: #f87171;
+}
+
+body.dark-mode .kpi-tendance.hausse {
+    color: #4ade80;
+}
+
+body.dark-mode .kpi-tendance.baisse {
+    color: #f87171;
+}
+
+body.dark-mode .progress {
+    background: #2a1f3d;
+}
+
+body.dark-mode .quick-action-grid button {
+    background: #1a1226;
+    border-color: #342548;
+}
+
+body.dark-mode .quick-action-grid button:hover {
+    background: #2a1a3d;
+    border-color: #4a3560;
+}
+
+body.dark-mode .quick-action-grid button > span {
+    background: #2a1a3d;
+    color: #c4b5fd;
+}
+
+body.dark-mode .quick-action-grid small {
+    color: #8b7ba0;
+}
+
+/* =========================================================
+   RESPONSIVE — GRAPHIQUES
+========================================================= */
+
+@media (max-width: 1000px) {
+    .dashboard-grid-large {
+        grid-template-columns: 1fr;
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Caisson;
+use App\Models\ChambreFroide;
 use App\Models\Depot;
 use App\Models\Prestation;
 use Carbon\Carbon;
@@ -106,6 +108,7 @@ class DepotController extends Controller
             'transferts',
             'prestations',
             'depositants',
+            'caisson.chambreFroide',
             ...Depot::TRACE,
         ])
             ->orderBy('created_at', 'desc')
@@ -280,6 +283,7 @@ class DepotController extends Controller
             'depositants',
             'sorties',
             'transferts',
+            'caisson.chambreFroide',
             ...Depot::TRACE,
         ])->find($id);
 
@@ -425,36 +429,73 @@ class DepotController extends Controller
     }
 
     /* =========================================================
-       ATTRIBUER UN BOX
+       ATTRIBUER UN CAISSON (sélection d'un caisson existant)
     ========================================================= */
 
     public function assignBox(Request $request, $id)
     {
-        $validator = Validator::make($request->all(), [
-            'box_name' => ['required', 'string', 'max:100'],
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Nom du box invalide.',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         $depot = Depot::find($id);
         if (!$depot) {
             return response()->json(['message' => 'Dépôt introuvable.'], 404);
         }
 
-        $this->refuserSiScelle($depot, "une attribution de box");
+        $this->refuserSiScelle($depot, "une attribution de caisson");
 
-        $depot->box_name = trim($request->input('box_name'));
+        if ($this->statutCalcule($depot) !== 'PRÉSENT') {
+            return response()->json([
+                'message' => 'Seul un corps présent peut recevoir un caisson.',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'caisson_id' => ['required', 'integer', 'exists:caissons,id'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Caisson invalide.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $caisson = Caisson::with('chambreFroide')
+            ->findOrFail($validator->validated()['caisson_id']);
+
+        if (!$caisson->actif || !$caisson->chambreFroide?->actif) {
+            return response()->json([
+                'message' => "Le caisson {$caisson->code} est désactivé : il ne peut pas être attribué.",
+            ], 422);
+        }
+
+        if ($caisson->chambreFroide->type === 'individuelle'
+            && $this->caissonOccupeParUnAutre($caisson->id, $depot->id)) {
+            return response()->json([
+                'message' => "Le caisson {$caisson->code} est déjà occupé. "
+                           . "Une chambre individuelle ne peut accueillir qu'un seul corps.",
+            ], 422);
+        }
+
+        $depot->caisson_id = $caisson->id;
         $depot->save();
 
+        $depot->load(['depositants', 'caisson.chambreFroide']);
+
         return response()->json([
-            'message' => 'Box attribué avec succès.',
-            'depot' => $depot->load('depositants'),
+            'message' => "Caisson {$caisson->code} attribué avec succès.",
+            'depot' => $depot,
         ]);
+    }
+
+    /**
+     * Vrai si un autre corps encore présent occupe déjà ce caisson.
+     */
+    private function caissonOccupeParUnAutre(int $caissonId, int $depotId): bool
+    {
+        return Depot::query()
+            ->where('caisson_id', $caissonId)
+            ->whereKeyNot($depotId)
+            ->presents()
+            ->exists();
     }
 
     /* =========================================================
@@ -486,7 +527,8 @@ class DepotController extends Controller
     public function corpsDisponibles()
     {
         try {
-            $depots = Depot::whereNull('date_sortie')
+            $depots = Depot::with('caisson.chambreFroide')
+                ->whereNull('date_sortie')
                 ->where('scelle', false)
                 ->orderBy('created_at', 'desc')
                 ->get([
@@ -494,7 +536,7 @@ class DepotController extends Controller
                     'date_naissance', 'age', 'date_deces', 'heure_deces',
                     'date_arrivee', 'heure_arrivee', 'provenance',
                     'service_origine', 'lieu_provenance', 'motif', 'etat',
-                    'emplacement', 'box_name', 'chapelle', 'contact_nom',
+                    'emplacement', 'box_name', 'caisson_id', 'chapelle', 'contact_nom',
                     'contact_telephone', 'contact_cni', 'lien_parente',
                     'scelle',
                 ]);
@@ -506,6 +548,55 @@ class DepotController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /* =========================================================
+       CAISSONS DISPONIBLES POUR UNE ATTRIBUTION
+       Arborescence chambre → caissons, avec occupation.
+       `depot_id` exclut le corps courant du décompte (réattribution).
+    ========================================================= */
+
+    public function caissonsDisponibles(Request $request)
+    {
+        $depotId = $request->integer('depot_id') ?: null;
+
+        $occupations = Depot::query()
+            ->selectRaw('caisson_id, COUNT(*) as total')
+            ->whereNotNull('caisson_id')
+            ->when($depotId, fn ($q) => $q->whereKeyNot($depotId))
+            ->presents()
+            ->groupBy('caisson_id')
+            ->pluck('total', 'caisson_id');
+
+        $chambres = ChambreFroide::query()
+            ->where('actif', true)
+            ->with(['caissons' => fn ($q) => $q->where('actif', true)])
+            ->orderBy('nom')
+            ->get()
+            ->map(function ($chambre) use ($occupations) {
+                $individuelle = $chambre->type === 'individuelle';
+
+                return [
+                    'id' => $chambre->id,
+                    'nom' => $chambre->nom,
+                    'type' => $chambre->type,
+                    'caissons' => $chambre->caissons->map(function ($caisson) use ($individuelle, $occupations) {
+                        $occupants = (int) ($occupations[$caisson->id] ?? 0);
+
+                        return [
+                            'id' => $caisson->id,
+                            'code' => $caisson->code,
+                            'occupants' => $occupants,
+                            'capacite' => $individuelle ? 1 : null,
+                            'disponible' => !$individuelle || $occupants === 0,
+                        ];
+                    })->values(),
+                ];
+            })
+            ->filter(fn ($chambre) => $chambre['caissons']->isNotEmpty())
+            ->values();
+
+        return response()->json(['chambres' => $chambres]);
     }
 
     /* =========================================================
