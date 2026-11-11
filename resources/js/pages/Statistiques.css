@@ -682,3 +682,218 @@
     background: #f4eef9;
     border-color: #bfa6d1;
 }
+/* ============================================================
+   TABLEAUX PROFESSIONNELS (ÉTAPE 9)
+============================================================ */
+
+.stats-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.stats-table thead th {
+    background: #faf8fb;
+    color: #81768a;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    padding: 11px 12px;
+    border-bottom: 1px solid #ebe5f0;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.stats-table tbody td {
+    padding: 11px 12px;
+    border-bottom: 1px solid #f1edf4;
+    color: #544a5d;
+    vertical-align: middle;
+}
+
+.stats-table tbody tr:nth-child(even) {
+    background: #fcfbfd;
+}
+
+.stats-table tbody tr:hover {
+    background: #f7f2fb;
+}
+
+.stats-table tfoot td {
+    padding: 12px;
+    border-top: 2px solid #e2d9ea;
+    background: #f6f1fa;
+    color: #57347c;
+    font-weight: 800;
+}
+
+.stats-table .stats-num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.stats-table .stats-rang {
+    width: 42px;
+    color: #a99cb4;
+    font-weight: 800;
+    text-align: center;
+}
+
+.stats-table .stats-libelle {
+    font-weight: 600;
+    color: #3f324b;
+}
+
+.stats-table .stats-part {
+    color: #7a3fab;
+    font-weight: 700;
+}
+
+.stats-table .stats-positif {
+    color: #287552;
+    font-weight: 700;
+}
+
+.stats-table .stats-alerte {
+    color: #a25a27;
+    font-weight: 700;
+}
+
+.stats-table-compact {
+    min-width: 320px;
+}
+
+.stats-barre-col {
+    width: 32%;
+    min-width: 130px;
+}
+
+.stats-barre {
+    display: block;
+    width: 100%;
+    height: 8px;
+    border-radius: 10px;
+    background: #eeeaf2;
+    overflow: hidden;
+}
+
+.stats-barre-remplissage {
+    display: block;
+    height: 100%;
+    min-width: 3px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #8a52bd, #6f35a5);
+}
+
+.stats-empty {
+    padding: 30px;
+    text-align: center;
+    color: #968c9d;
+    background: #fbfafc;
+    border: 1px dashed #e3dbea;
+    border-radius: 9px;
+}
+
+.stats-table-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+}
+
+.stats-subtitle {
+    margin: 0 0 10px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .7px;
+    text-transform: uppercase;
+    color: #7951a9;
+}
+
+.stats-figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.stats-figure {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px;
+    background: #f8f4fb;
+    border: 1px solid #ece4f3;
+    border-radius: 10px;
+}
+
+.stats-figure > span {
+    color: #85798d;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .8px;
+}
+
+.stats-figure > strong {
+    color: #612e93;
+    font-size: 28px;
+    line-height: 1;
+}
+
+.stats-figure > small {
+    color: #8b8191;
+    font-size: 11px;
+}
+
+.stats-note {
+    margin: 14px 0 0;
+    font-size: 12px;
+    color: #8b8194;
+}
+
+.stats-progress {
+    margin-top: 18px;
+}
+
+.stats-progress-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #665b70;
+}
+
+.stats-progress-label strong {
+    color: #6f35a5;
+    font-size: 14px;
+}
+
+/* Barre de progression du taux d'encaissement */
+.stats-progress .stats-barre {
+    height: 10px;
+}
+
+@media (max-width: 900px) {
+    .stats-table-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 750px) {
+    .stats-barre-col {
+        min-width: 90px;
+    }
+
+    .stats-table thead th,
+    .stats-table tbody td,
+    .stats-table tfoot td {
+        padding: 10px 9px;
+    }
+}

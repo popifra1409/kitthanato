@@ -3045,3 +3045,85 @@ button.profession-ajouter {
   background: #374151;
   color: #ffffff ;
 }
+/* =========================================================
+   ÉTAPE 9 — EMPLACEMENT UNIFIÉ & AIDES DE FORMULAIRE
+========================================================= */
+
+.emplacement-cell {
+  min-width: 170px;
+}
+
+.emplacement-badge.vide {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #9a5b13;
+}
+
+.emplacement-badge.ancien {
+  background: #f4f4f5;
+  border-color: #e4e4e7;
+  color: #52525b;
+}
+
+.emplacement-detail {
+  display: block;
+  margin-top: 4px;
+  color: #8a7e95;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.emplacement-attribuer {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 6px;
+  padding: 4px 8px;
+  border: 1px dashed #c4b5fd;
+  border-radius: 6px;
+  background: transparent;
+  color: #6d28d9;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.emplacement-attribuer:hover {
+  background: #f5f3ff;
+  border-color: #8b5cf6;
+}
+
+.form-help {
+  display: block;
+  margin-top: 6px;
+  color: #8b8194;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.form-help-warning {
+  color: #b45309;
+  font-weight: 600;
+}
+
+body.dark-mode .emplacement-badge.vide {
+  background: #3a2a10;
+  border-color: #7a531d;
+  color: #fbbf24;
+}
+
+body.dark-mode .emplacement-badge.ancien {
+  background: #2a1f3d;
+  border-color: #4a3560;
+  color: #c4b5fd;
+}
+
+body.dark-mode .emplacement-detail,
+body.dark-mode .form-help {
+  color: #a89ab8;
+}
+
+body.dark-mode .form-help-warning {
+  color: #fbbf24;
+}

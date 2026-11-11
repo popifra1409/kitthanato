@@ -77,6 +77,61 @@ class CaissonAttributionTest extends ApiTestCase
             ->assertJsonValidationErrors('caisson_id');
     }
 
+    public function test_creation_avec_caisson_derive_l_emplacement(): void
+    {
+        $this->connecter('ADMIN');
+
+        $chambre = $this->creerChambre('Chambre Test', 'commune', 1);
+        $caisson = $chambre->caissons->first();
+
+        $donnees = array_merge($this->depotValide(), ['caisson_id' => $caisson->id]);
+        unset($donnees['emplacement']);
+
+        $id = $this->postJson('/api/depots', $donnees)
+            ->assertCreated()
+            ->assertJsonPath('depot.caisson_id', $caisson->id)
+            ->assertJsonPath('depot.emplacement', 'Chambre Test · A1')
+            ->json('depot.id');
+
+        $this->assertDatabaseHas('depots', [
+            'id' => $id,
+            'caisson_id' => $caisson->id,
+            'emplacement' => 'Chambre Test · A1',
+        ]);
+    }
+
+    public function test_creation_sans_emplacement_ni_caisson_reste_a_attribuer(): void
+    {
+        $this->connecter('ADMIN');
+
+        $donnees = $this->depotValide();
+        unset($donnees['emplacement']);
+
+        $this->postJson('/api/depots', $donnees)
+            ->assertCreated()
+            ->assertJsonPath('depot.emplacement', '')
+            ->assertJsonPath('depot.caisson_id', null);
+
+        $this->assertDatabaseHas('depots', [
+            'code' => $donnees['code'],
+            'caisson_id' => null,
+            'emplacement' => '',
+        ]);
+    }
+
+    public function test_l_attribution_met_a_jour_l_emplacement(): void
+    {
+        $this->connecter('ADMIN');
+
+        $chambre = $this->creerChambre('Chambre Libellé', 'commune', 1);
+        $caisson = $chambre->caissons->first();
+        $depot = $this->creerDepot();
+
+        $this->attribuer($depot['id'], $caisson->id)
+            ->assertOk()
+            ->assertJsonPath('depot.emplacement', 'Chambre Libellé · A1');
+    }
+
     public function test_une_chambre_individuelle_n_accepte_qu_un_seul_corps(): void
     {
         $this->connecter('ADMIN');
@@ -229,6 +284,60 @@ class CaissonAttributionTest extends ApiTestCase
         $this->connecter('USER1');
 
         $this->attribuer($depot['id'], $caisson->id)->assertOk();
+    }
+
+    public function test_un_transfert_interne_peut_cibler_un_caisson(): void
+    {
+        $this->connecter('ADMIN');
+
+        $chambre = $this->creerChambre('Transfert Commune', 'commune', 1);
+        $caisson = $chambre->caissons->first();
+        $depot = $this->creerDepot();
+
+        $this->postJson('/api/transferts', [
+            'depot_id' => $depot['id'],
+            'date' => now()->toDateString(),
+            'heure' => '11:00',
+            'type' => 'interne',
+            'motif' => 'Réorganisation',
+            'caisson_id' => $caisson->id,
+        ])
+            ->assertCreated()
+            ->assertJsonPath(
+                'emplacement_destination',
+                'Transfert Commune · A1'
+            );
+
+        $this->assertDatabaseHas('depots', [
+            'id' => $depot['id'],
+            'caisson_id' => $caisson->id,
+            'emplacement' => 'Transfert Commune · A1',
+        ]);
+    }
+
+    public function test_un_transfert_interne_refuse_un_caisson_individuel_occupe(): void
+    {
+        $this->connecter('ADMIN');
+
+        $chambre = $this->creerChambre('Transfert Individuelle', 'individuelle', 1);
+        $caisson = $chambre->caissons->first();
+
+        $premier = $this->creerDepot();
+        $second = $this->creerDepot();
+
+        $this->attribuer($premier['id'], $caisson->id)->assertOk();
+
+        $reponse = $this->postJson('/api/transferts', [
+            'depot_id' => $second['id'],
+            'date' => now()->toDateString(),
+            'heure' => '11:00',
+            'type' => 'interne',
+            'motif' => 'Réorganisation',
+            'caisson_id' => $caisson->id,
+        ])->assertStatus(422);
+
+        $this->assertStringContainsString('déjà occupé', $reponse->json('message'));
+        $this->assertNull(Depot::find($second['id'])->caisson_id);
     }
 
     public function test_l_attribution_exige_la_permission_depots_update(): void

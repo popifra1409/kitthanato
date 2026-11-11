@@ -165,7 +165,8 @@ class DepotController extends Controller
             'lieu_provenance' => 'nullable|string|max:200',
             'motif' => 'required|string|max:100',
             'etat' => 'nullable|string|max:150',
-            'emplacement' => 'required|string|max:100',
+            'emplacement' => ['nullable', 'string', 'max:100'],
+            'caisson_id' => ['nullable', 'integer', 'exists:caissons,id'],
             'chapelle' => 'required|string|max:100',
             'contact_nom' => 'required|string|max:150',
             'contact_telephone' => 'required|string|max:30',
@@ -207,8 +208,16 @@ class DepotController extends Controller
             $age = $aujourdHui->diff($dateNaissance)->y;
         }
 
+        /* Caisson facultatif : s'il est fourni, il devient la vérité sur l'emplacement. */
+        $caisson = !empty($data['caisson_id'])
+            ? $this->caissonAttribuable((int) $data['caisson_id'])
+            : null;
+        $emplacement = $caisson
+            ? $this->libelleEmplacement($caisson)
+            : ($data['emplacement'] ?? '');
+
         /* Transaction pour sécuriser le compteur de code_defunt */
-        $depot = DB::transaction(function () use ($data, $age) {
+        $depot = DB::transaction(function () use ($data, $age, $caisson, $emplacement) {
 
             $codeDefunt = $this->genererProchainCodeDefunt();
 
@@ -231,7 +240,8 @@ class DepotController extends Controller
                 'lieu_provenance' => $data['lieu_provenance'] ?? null,
                 'motif' => $data['motif'],
                 'etat' => $data['etat'] ?? null,
-                'emplacement' => $data['emplacement'],
+                'emplacement' => $emplacement,
+                'caisson_id' => $caisson?->id,
                 'chapelle' => $data['chapelle'],
                 'contact_nom' => $data['contact_nom'],
                 'contact_telephone' => $data['contact_telephone'],
@@ -264,7 +274,7 @@ class DepotController extends Controller
             return $depot;
         });
 
-        $depot->load(['prestations', 'depositants']);
+        $depot->load(['prestations', 'depositants', 'caisson.chambreFroide']);
 
         return response()->json([
             'message' => 'Dépôt enregistré avec succès.',
@@ -330,7 +340,8 @@ class DepotController extends Controller
             'lieu_provenance' => 'nullable|string|max:200',
             'motif' => 'required|string|max:100',
             'etat' => 'nullable|string|max:150',
-            'emplacement' => 'required|string|max:100',
+            'emplacement' => ['nullable', 'string', 'max:100'],
+            'caisson_id' => ['nullable', 'integer', 'exists:caissons,id'],
             'chapelle' => 'required|string|max:100',
             'contact_nom' => 'required|string|max:150',
             'contact_telephone' => 'required|string|max:30',
@@ -371,6 +382,18 @@ class DepotController extends Controller
             $age = $aujourdHui->diff($dateNaissance)->y;
         }
 
+        /* Un caisson inchangé n'est pas revalidé (il peut être désactivé). */
+        $caisson = null;
+        if (!empty($data['caisson_id'])) {
+            $caisson = (int) $data['caisson_id'] === (int) $depot->caisson_id
+                ? $depot->caisson()->with('chambreFroide')->first()
+                : $this->caissonAttribuable((int) $data['caisson_id'], $depot->id);
+        }
+
+        $emplacement = $caisson
+            ? $this->libelleEmplacement($caisson)
+            : ($data['emplacement'] ?? $depot->emplacement);
+
         /* ⚠️ On ne touche JAMAIS à code_defunt en modification */
         $depot->update([
             'code' => strtoupper(trim($data['code'])),
@@ -390,7 +413,8 @@ class DepotController extends Controller
             'lieu_provenance' => $data['lieu_provenance'] ?? null,
             'motif' => $data['motif'],
             'etat' => $data['etat'] ?? null,
-            'emplacement' => $data['emplacement'],
+            'emplacement' => $emplacement,
+            'caisson_id' => $caisson?->id ?? $depot->caisson_id,
             'chapelle' => $data['chapelle'],
             'contact_nom' => $data['contact_nom'],
             'contact_telephone' => $data['contact_telephone'],
@@ -420,7 +444,7 @@ class DepotController extends Controller
             $depot->prestations()->sync($prestationsAvecPrix);
         }
 
-        $depot->load(['prestations', 'depositants']);
+        $depot->load(['prestations', 'depositants', 'caisson.chambreFroide']);
 
         return response()->json([
             'message' => 'Dépôt modifié avec succès.',
@@ -458,24 +482,13 @@ class DepotController extends Controller
             ], 422);
         }
 
-        $caisson = Caisson::with('chambreFroide')
-            ->findOrFail($validator->validated()['caisson_id']);
-
-        if (!$caisson->actif || !$caisson->chambreFroide?->actif) {
-            return response()->json([
-                'message' => "Le caisson {$caisson->code} est désactivé : il ne peut pas être attribué.",
-            ], 422);
-        }
-
-        if ($caisson->chambreFroide->type === 'individuelle'
-            && $this->caissonOccupeParUnAutre($caisson->id, $depot->id)) {
-            return response()->json([
-                'message' => "Le caisson {$caisson->code} est déjà occupé. "
-                           . "Une chambre individuelle ne peut accueillir qu'un seul corps.",
-            ], 422);
-        }
+        $caisson = $this->caissonAttribuable(
+            (int) $validator->validated()['caisson_id'],
+            $depot->id
+        );
 
         $depot->caisson_id = $caisson->id;
+        $depot->emplacement = $this->libelleEmplacement($caisson);
         $depot->save();
 
         $depot->load(['depositants', 'caisson.chambreFroide']);
@@ -496,6 +509,50 @@ class DepotController extends Controller
             ->whereKeyNot($depotId)
             ->presents()
             ->exists();
+    }
+
+    /* Libellé canonique stocké dans `emplacement` pour un caisson. */
+    private function libelleEmplacement(Caisson $caisson): string
+    {
+        $nomChambre = $caisson->chambreFroide?->nom;
+
+        return $nomChambre
+            ? "{$nomChambre} · {$caisson->code}"
+            : $caisson->code;
+    }
+
+    /**
+     * Retourne le caisson s'il est attribuable, sinon interrompt la requête
+     * avec un 422 explicite (mêmes règles que l'attribution manuelle).
+     */
+    private function caissonAttribuable(int $caissonId, int $depotId = 0): Caisson
+    {
+        $caisson = Caisson::with('chambreFroide')->find($caissonId);
+
+        if (!$caisson) {
+            abort(response()->json([
+                'message' => 'Caisson invalide.',
+                'errors' => ['caisson_id' => ['Le caisson sélectionné est introuvable.']],
+            ], 422));
+        }
+
+        if (!$caisson->actif || !$caisson->chambreFroide?->actif) {
+            abort(response()->json([
+                'message' => "Le caisson {$caisson->code} est désactivé : il ne peut pas être attribué.",
+                'errors' => ['caisson_id' => ["Le caisson {$caisson->code} est désactivé."]],
+            ], 422));
+        }
+
+        if ($caisson->chambreFroide->type === 'individuelle'
+            && $this->caissonOccupeParUnAutre($caisson->id, $depotId)) {
+            abort(response()->json([
+                'message' => "Le caisson {$caisson->code} est déjà occupé. "
+                           . "Une chambre individuelle ne peut accueillir qu'un seul corps.",
+                'errors' => ['caisson_id' => ['Ce caisson est déjà occupé.']],
+            ], 422));
+        }
+
+        return $caisson;
     }
 
     /* =========================================================

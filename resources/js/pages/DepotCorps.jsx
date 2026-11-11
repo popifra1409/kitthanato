@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import "./DepotCorps.css";
 import ConfirmDialog from "../components/ConfirmDialog";
 import NotificationBox from "../components/NotificationBox";
+import Pagination from "../components/Pagination";
+import { usePagination } from "../utils/usePagination";
 
 import api, { asList } from "../services/api";
 import { hasPermission } from "../services/session";
@@ -100,6 +102,49 @@ const libelleCaisson = (depot) => {
     return depot?.box_name || "";
 };
 
+const libelleChambre = (chambre) => {
+    if (!chambre) return "";
+    if (chambre.type === "individuelle") return "Chambre individuelle";
+    if (chambre.type === "commune") return "Chambre commune";
+    return chambre.nom || "";
+};
+
+/* Ancien texte libre → vocabulaire actuel (chambre froide commune → chambre commune). */
+const normaliserEmplacement = (valeur) => {
+    const texte = String(valeur || "").trim();
+    if (!texte) return "";
+    return texte
+        .replace(/chambre\s+froide\s+individuelle/i, "Chambre individuelle")
+        .replace(/chambre\s+froide\s+commune/i, "Chambre commune")
+        .replace(/chambre\s+froide/i, "Chambre");
+};
+
+/* Une seule représentation de l'emplacement pour la liste et la fiche. */
+const infosEmplacement = (depot) => {
+    if (depot?.caisson) {
+        const chambre = depot.caisson.chambre_froide;
+        return {
+            libelle: libelleCaisson(depot),
+            detail: libelleChambre(chambre),
+            type: "caisson",
+        };
+    }
+
+    if (depot?.box_name) {
+        const ancien = [normaliserEmplacement(depot.emplacement), depot.box_name]
+            .filter(Boolean)
+            .join(" · ");
+        return { libelle: ancien, detail: "Ancien emplacement", type: "ancien" };
+    }
+
+    const ancien = normaliserEmplacement(depot?.emplacement);
+    if (ancien && !/^non attribu/i.test(ancien)) {
+        return { libelle: ancien, detail: "Ancien emplacement", type: "ancien" };
+    }
+
+    return { libelle: "Non attribué", detail: "", type: "vide" };
+};
+
 function DepotCorps() {
     const getNomEnregistreur = (depot) => depot?.createur?.name || "-";
 
@@ -154,7 +199,6 @@ function DepotCorps() {
     const [prestations, setPrestations] = useState([]);
     const [prestationsSelectionnees, setPrestationsSelectionnees] = useState([]);
     const [montantPrestations, setMontantPrestations] = useState(0);
-    const [loadingPrestations, setLoadingPrestations] = useState(true);
 
     /* Services d'origine */
     const [services, setServices] = useState([]);
@@ -172,6 +216,16 @@ function DepotCorps() {
     const [chambresCaissons, setChambresCaissons] = useState([]);
     const [boxChargement, setBoxChargement] = useState(false);
     const [boxLoading, setBoxLoading] = useState(false);
+
+    /* Emplacements du formulaire (chambres → caissons) */
+    const [chambresFormulaire, setChambresFormulaire] = useState([]);
+    const [chargementEmplacements, setChargementEmplacements] = useState(false);
+
+    /* Chapelles du référentiel */
+    const [chapelles, setChapelles] = useState([]);
+
+    /* Enregistrement en cours (anti double-clic) */
+    const [enregistrement, setEnregistrement] = useState(false);
 
     /* =====================================================
        FORMULAIRE
@@ -197,10 +251,27 @@ function DepotCorps() {
         motif: "",
         etat: "",
         emplacement: "",
+        caisson_id: "",
         chapelle: "",
     };
 
     const [formData, setFormData] = useState(initialForm);
+
+    /* Caisson choisi dans le formulaire (chambre associée pour le libellé). */
+    const caissonSelectionne = (() => {
+        if (!formData.caisson_id) return null;
+        for (const chambre of chambresFormulaire) {
+            const caisson = (chambre.caissons || []).find(
+                (c) => String(c.id) === String(formData.caisson_id)
+            );
+            if (caisson) return { ...caisson, chambre };
+        }
+        return null;
+    })();
+
+    const emplacementCalcule = caissonSelectionne
+        ? `${caissonSelectionne.chambre.nom} · ${caissonSelectionne.code}`
+        : formData.emplacement || "Non attribué";
 
     /* Prévisualisation du prochain code_defunt */
     const prochainDefuntPreview = useMemo(
@@ -334,7 +405,6 @@ function DepotCorps() {
 
     const fetchPrestations = async () => {
         try {
-            setLoadingPrestations(true);
             const data = asList(
                 await api.prestations.list(),
                 "prestations"
@@ -343,8 +413,29 @@ function DepotCorps() {
         } catch (error) {
             console.error(error);
             setPrestations([]);
+        }
+    };
+
+    const chargerChapelles = async () => {
+        try {
+            const data = asList(await api.chapelles.list(), "chapelles");
+            setChapelles(data);
+        } catch (error) {
+            console.error("Erreur de chargement des chapelles :", error);
+            setChapelles([]);
+        }
+    };
+
+    const chargerEmplacements = async () => {
+        try {
+            setChargementEmplacements(true);
+            const reponse = await api.depots.caissonsDisponibles();
+            setChambresFormulaire(reponse?.chambres || []);
+        } catch (error) {
+            console.error("Erreur de chargement des caissons :", error);
+            setChambresFormulaire([]);
         } finally {
-            setLoadingPrestations(false);
+            setChargementEmplacements(false);
         }
     };
 
@@ -353,6 +444,8 @@ function DepotCorps() {
         chargerProfessions();
         chargerServices();
         fetchPrestations();
+        chargerChapelles();
+        chargerEmplacements();
     }, []);
 
     /* Fermeture menu actions */
@@ -514,16 +607,6 @@ function DepotCorps() {
        PRESTATIONS
     ===================================================== */
 
-    const handlePrestationChange = (id) => {
-        const numericId = Number(id);
-        setPrestationsSelectionnees((prev) => {
-            if (prev.includes(numericId)) {
-                return prev.filter((item) => item !== numericId);
-            }
-            return [...prev, numericId];
-        });
-    };
-
     /* =====================================================
        DÉPOSANTS
     ===================================================== */
@@ -638,8 +721,6 @@ function DepotCorps() {
             }
             if (!formData.etat)
                 return erreur("Veuillez sélectionner l'état du corps.");
-            if (!formData.emplacement)
-                return erreur("Veuillez sélectionner l'emplacement.");
         }
 
         return true;
@@ -677,6 +758,7 @@ function DepotCorps() {
     const openNewForm = () => {
         setEditingId(null);
         resetFormulaire();
+        chargerEmplacements();
         setShowForm(true);
     };
 
@@ -776,9 +858,11 @@ function DepotCorps() {
             motif: depot.motif || "",
             etat: depot.etat || "",
             emplacement: depot.emplacement || "",
+            caisson_id: depot.caisson_id ? String(depot.caisson_id) : "",
             chapelle: depot.chapelle || "",
         });
 
+        chargerEmplacements();
         setShowForm(true);
     };
 
@@ -789,6 +873,8 @@ function DepotCorps() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (enregistrement) return;
 
         if (currentStep < ETAPES.length) {
             etapeSuivante();
@@ -840,6 +926,8 @@ function DepotCorps() {
         }
 
         try {
+            setEnregistrement(true);
+
             const donnees = {
                 ...formData,
 
@@ -849,6 +937,14 @@ function DepotCorps() {
                 /* ❌ PAS de code_defunt dans le payload :
                    le backend le génère à la création
                    et le conserve à la modification. */
+
+                /* Caisson choisi → le backend en dérive l'emplacement. */
+                caisson_id: formData.caisson_id
+                    ? Number(formData.caisson_id)
+                    : null,
+                emplacement: caissonSelectionne
+                    ? emplacementCalcule
+                    : formData.emplacement || "",
 
                 motif: formData.motif || "Non précisé",
                 etat: formData.etat || "Non précisé",
@@ -898,6 +994,7 @@ function DepotCorps() {
 
             closeForm();
             await fetchDepots();
+            chargerEmplacements();
         } catch (error) {
             console.error(error);
             showNotif(
@@ -907,6 +1004,8 @@ function DepotCorps() {
                     error.message ||
                     "Impossible d'enregistrer le dépôt."
             );
+        } finally {
+            setEnregistrement(false);
         }
     };
 
@@ -987,6 +1086,7 @@ function DepotCorps() {
                 "Caisson attribué",
                 reponse?.message || "Le caisson a été attribué."
             );
+            chargerEmplacements();
         } catch (error) {
             console.error(error);
             showNotif(
@@ -1129,6 +1229,11 @@ function DepotCorps() {
         return texte.includes(recherche);
     });
 
+    const paginationDepots = usePagination(depotsFiltres, {
+        tailleInitiale: 10,
+        resetKey: search,
+    });
+
     /* =====================================================
        DATES MIN / MAX
     ===================================================== */
@@ -1223,7 +1328,16 @@ function DepotCorps() {
                                     </td>
                                 </tr>
                             ) : (
-                                depotsFiltres.map((depot) => (
+                                paginationDepots.items.map((depot) => {
+                                    const emplacement = infosEmplacement(depot);
+                                    const peutAttribuer =
+                                        emplacement.type !== "caisson" &&
+                                        !depot.scelle &&
+                                        (depot.statut || "PRÉSENT") ===
+                                            "PRÉSENT" &&
+                                        hasPermission("depots.update");
+
+                                    return (
                                     <tr
                                         key={depot.id}
                                         className={
@@ -1271,13 +1385,25 @@ function DepotCorps() {
                                         </td>
 
                                         <td className="emplacement-cell">
-                                            <span className="emplacement-badge">
-                                                {depot.emplacement || "-"}
+                                            <span
+                                                className={`emplacement-badge ${emplacement.type}`}
+                                            >
+                                                {emplacement.libelle}
                                             </span>
-                                            {libelleCaisson(depot) && (
-                                                <span className="box-badge">
-                                                    {libelleCaisson(depot)}
+                                            {emplacement.detail && (
+                                                <span className="emplacement-detail">
+                                                    {emplacement.detail}
                                                 </span>
+                                            )}
+                                            {peutAttribuer && (
+                                                <button
+                                                    type="button"
+                                                    className="emplacement-attribuer"
+                                                    onClick={() => ouvrirBox(depot)}
+                                                    title="Attribuer un caisson"
+                                                >
+                                                    + Attribuer
+                                                </button>
                                             )}
                                         </td>
 
@@ -1433,16 +1559,24 @@ function DepotCorps() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
                 </div>
 
-                <div className="table-footer">
-                    {depotsFiltres.length} résultat
-                    {depotsFiltres.length !== 1 ? "s" : ""}
-                </div>
+                {!loading && depotsFiltres.length > 0 && (
+                    <Pagination
+                        page={paginationDepots.page}
+                        pages={paginationDepots.pages}
+                        total={paginationDepots.total}
+                        taille={paginationDepots.taille}
+                        onPage={paginationDepots.setPage}
+                        onTaille={paginationDepots.setTaille}
+                        element="dépôt"
+                    />
+                )}
             </div>
 
             {/* FORMULAIRE */}
@@ -1856,21 +1990,92 @@ function DepotCorps() {
                                             </select>
                                         </div>
 
-                                        <div className="form-group">
-                                            <label>Emplacement *</label>
+                                        <div className="form-group full-width">
+                                            <label>Caisson / emplacement</label>
                                             <select
-                                                name="emplacement"
-                                                value={formData.emplacement}
-                                                onChange={handleChange}
+                                                name="caisson_id"
+                                                value={formData.caisson_id}
+                                                onChange={(e) =>
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        caisson_id:
+                                                            e.target.value,
+                                                    }))
+                                                }
+                                                disabled={chargementEmplacements}
                                             >
-                                                <option value="">Sélectionner</option>
-                                                <option value="Chambre froide individuelle">
-                                                    Chambre froide individuelle
+                                                <option value="">
+                                                    {chargementEmplacements
+                                                        ? "Chargement des caissons..."
+                                                        : "— Non attribué (à attribuer plus tard) —"}
                                                 </option>
-                                                <option value="Chambre froide commune">
-                                                    Chambre froide commune
-                                                </option>
+                                                {chambresFormulaire.map(
+                                                    (chambre) => (
+                                                        <optgroup
+                                                            key={chambre.id}
+                                                            label={`${
+                                                                chambre.nom
+                                                            } (${
+                                                                chambre.type ===
+                                                                "individuelle"
+                                                                    ? "individuelle"
+                                                                    : "commune"
+                                                            })`}
+                                                        >
+                                                            {chambre.caissons.map(
+                                                                (caisson) => (
+                                                                    <option
+                                                                        key={
+                                                                            caisson.id
+                                                                        }
+                                                                        value={
+                                                                            caisson.id
+                                                                        }
+                                                                        disabled={
+                                                                            !caisson.disponible &&
+                                                                            String(
+                                                                                caisson.id
+                                                                            ) !==
+                                                                                String(
+                                                                                    formData.caisson_id
+                                                                                )
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            caisson.code
+                                                                        }
+                                                                        {caisson.occupants >
+                                                                        0
+                                                                            ? caisson.capacite ===
+                                                                              1
+                                                                                ? " — occupé"
+                                                                                : ` — ${caisson.occupants} corps`
+                                                                            : " — libre"}
+                                                                    </option>
+                                                                )
+                                                            )}
+                                                        </optgroup>
+                                                    )
+                                                )}
                                             </select>
+
+                                            <small className="form-help">
+                                                {caissonSelectionne
+                                                    ? `Emplacement retenu : ${emplacementCalcule}`
+                                                    : "Le corps apparaîtra « Non attribué » dans la liste jusqu'à l'attribution d'un caisson."}
+                                            </small>
+
+                                            {!chargementEmplacements &&
+                                                chambresFormulaire.length ===
+                                                    0 && (
+                                                    <small className="form-help form-help-warning">
+                                                        Aucun caisson actif.
+                                                        Créez-en dans
+                                                        Emplacements, ou
+                                                        enregistrez le corps
+                                                        sans caisson.
+                                                    </small>
+                                                )}
                                         </div>
 
                                         <div className="form-group">
@@ -1880,9 +2085,33 @@ function DepotCorps() {
                                                 value={formData.chapelle}
                                                 onChange={handleChange}
                                             >
-                                                <option value="">Aucune</option>
-                                                <option value="Petite chapelle">Petite chapelle</option>
-                                                <option value="Grande chapelle">Grande chapelle</option>
+                                                <option value="Aucune">
+                                                    Aucune
+                                                </option>
+                                                {chapelles.map((chapelle) => (
+                                                    <option
+                                                        key={chapelle.id}
+                                                        value={chapelle.nom}
+                                                    >
+                                                        {chapelle.nom}
+                                                    </option>
+                                                ))}
+                                                {formData.chapelle &&
+                                                    formData.chapelle !==
+                                                        "Aucune" &&
+                                                    !chapelles.some(
+                                                        (c) =>
+                                                            c.nom ===
+                                                            formData.chapelle
+                                                    ) && (
+                                                        <option
+                                                            value={
+                                                                formData.chapelle
+                                                            }
+                                                        >
+                                                            {formData.chapelle}
+                                                        </option>
+                                                    )}
                                             </select>
                                         </div>
                                     </div>
@@ -2050,8 +2279,11 @@ function DepotCorps() {
                                         key="btn-enregistrer"
                                         type="submit"
                                         className="button-save"
+                                        disabled={enregistrement}
                                     >
-                                        {editingId
+                                        {enregistrement
+                                            ? "Enregistrement..."
+                                            : editingId
                                             ? "Enregistrer les modifications"
                                             : "Enregistrer le dépôt"}
                                     </button>
@@ -2208,11 +2440,13 @@ function DepotCorps() {
                                 </div>
                                 <div className="detail-item">
                                     <label>Emplacement</label>
-                                    <span>{selectedDepot.emplacement || "-"}</span>
+                                    <span>{infosEmplacement(selectedDepot).libelle}</span>
                                 </div>
                                 <div className="detail-item">
-                                    <label>Caisson attribué</label>
-                                    <span>{libelleCaisson(selectedDepot) || "-"}</span>
+                                    <label>Type de chambre</label>
+                                    <span>
+                                        {infosEmplacement(selectedDepot).detail || "-"}
+                                    </span>
                                 </div>
                                 <div className="detail-item">
                                     <label>Chapelle</label>

@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import "./Transfert.css";
 import ConfirmDialog from "../components/ConfirmDialog";
 import NotificationBox from "../components/NotificationBox";
+import Pagination from "../components/Pagination";
+import { usePagination } from "../utils/usePagination";
 
 import api from "../services/api";
 import { hasPermission } from "../services/session";
@@ -52,6 +54,9 @@ function Transfert() {
 
     /* Emplacement initial (pour modification) */
     const [emplacementInitial, setEmplacementInitial] = useState("");
+
+    /* Chambres et caissons disponibles pour un transfert interne */
+    const [chambresTransfert, setChambresTransfert] = useState([]);
 
     /* =====================================================
        FERMER LE MENU AU CLIC EXTÉRIEUR / ÉCHAP
@@ -214,6 +219,18 @@ function Transfert() {
         }
     };
 
+    const chargerCaissons = async (depotId = "") => {
+        try {
+            const donnees = await api.depots.caissonsDisponibles(
+                depotId || undefined
+            );
+            setChambresTransfert(donnees?.chambres || []);
+        } catch (error) {
+            console.error("Erreur chargement des caissons :", error);
+            setChambresTransfert([]);
+        }
+    };
+
     /* =====================================================
        CHARGER LES TRANSFERTS
     ===================================================== */
@@ -275,6 +292,10 @@ function Transfert() {
 
             return nouveau;
         });
+
+        if (name === "depot_id") {
+            chargerCaissons(value);
+        }
     };
 
     /* =====================================================
@@ -309,6 +330,36 @@ function Transfert() {
         return [...new Set(liste)];
     }, [depots]);
 
+    /* Options de destination interne : caissons actifs + anciens libellés. */
+    const optionsDestination = useMemo(() => {
+        const caissons = [];
+
+        chambresTransfert.forEach((chambre) => {
+            (chambre.caissons || []).forEach((caisson) => {
+                caissons.push({
+                    libelle: `${chambre.nom} · ${caisson.code}`,
+                    caissonId: caisson.id,
+                    chambre: chambre.nom,
+                    typeChambre: chambre.type,
+                    disponible: caisson.disponible,
+                });
+            });
+        });
+
+        const libellesCaissons = new Set(caissons.map((c) => c.libelle));
+
+        const anciens = emplacements
+            .filter((emplacement) => !libellesCaissons.has(emplacement))
+            .map((emplacement) => ({
+                libelle: emplacement,
+                caissonId: null,
+                chambre: null,
+                disponible: true,
+            }));
+
+        return { caissons, anciens };
+    }, [chambresTransfert, emplacements]);
+
     /* =====================================================
        NOUVEAU TRANSFERT
     ===================================================== */
@@ -327,6 +378,7 @@ function Transfert() {
             motif: "",
         });
 
+        chargerCaissons();
         setShowForm(true);
     };
 
@@ -411,9 +463,10 @@ function Transfert() {
             type,
             emplacement_destination: emplacementDestination,
             destination,
-            motif: "",
+            motif: transfert.motif || "",
         });
 
+        chargerCaissons(depotId);
         setShowForm(true);
     };
 
@@ -583,19 +636,31 @@ function Transfert() {
     const saveTransfert = async (e) => {
         e.preventDefault();
 
+        if (saving) return;
+
         if (!validateForm()) return;
 
         setSaving(true);
+
+        const destinationInterne = String(
+            formData.emplacement_destination || ""
+        ).trim();
+
+        const caissonChoisi =
+            formData.type === "interne"
+                ? optionsDestination.caissons.find(
+                      (caisson) => caisson.libelle === destinationInterne
+                  )
+                : null;
 
         const dataToSend = {
             date: formData.date,
             heure: formData.heure,
             depot_id: Number(formData.depot_id),
             type: formData.type,
+            caisson_id: caissonChoisi ? caissonChoisi.caissonId : null,
             emplacement_destination:
-                formData.type === "interne"
-                    ? String(formData.emplacement_destination).trim()
-                    : null,
+                formData.type === "interne" ? destinationInterne : null,
             destination:
                 formData.type === "externe"
                     ? String(formData.destination).trim()
@@ -695,6 +760,11 @@ function Transfert() {
             return correspondRecherche && correspondStatut;
         });
     }, [transferts, search, statutFiltre]);
+
+    const paginationTransferts = usePagination(transfertsFiltres, {
+        tailleInitiale: 10,
+        resetKey: `${search}::${statutFiltre}`,
+    });
 
     /* =====================================================
        GETTERS
@@ -839,7 +909,7 @@ function Transfert() {
                         CHARGEMENT DES TRANSFERTS...
                     </div>
                 ) : transfertsFiltres.length > 0 ? (
-                    transfertsFiltres.map((transfert) => {
+                    paginationTransferts.items.map((transfert) => {
                         const type = getType(transfert);
                         const statut = getStatut(transfert);
 
@@ -971,6 +1041,18 @@ function Transfert() {
                         {transfertsFiltres.length} TRANSFERT(S) AFFICHÉ(S)
                     </span>
                 </div>
+
+                {!loading && transfertsFiltres.length > 0 && (
+                    <Pagination
+                        page={paginationTransferts.page}
+                        pages={paginationTransferts.pages}
+                        total={paginationTransferts.total}
+                        taille={paginationTransferts.taille}
+                        onPage={paginationTransferts.setPage}
+                        onTaille={paginationTransferts.setTaille}
+                        element="transfert"
+                    />
+                )}
             </div>
 
             {/* ==========================================
@@ -1131,22 +1213,66 @@ function Transfert() {
                                                 SÉLECTIONNER UN EMPLACEMENT
                                             </option>
 
-                                            {emplacements.map((emplacement) => (
-                                                <option
-                                                    key={emplacement}
-                                                    value={emplacement}
-                                                >
-                                                    {emplacement}
-                                                </option>
-                                            ))}
+                                            {optionsDestination.caissons.length >
+                                                0 && (
+                                                <optgroup label="Caissons disponibles">
+                                                    {optionsDestination.caissons.map(
+                                                        (caisson) => (
+                                                            <option
+                                                                key={`caisson-${caisson.caissonId}`}
+                                                                value={
+                                                                    caisson.libelle
+                                                                }
+                                                                disabled={
+                                                                    !caisson.disponible &&
+                                                                    caisson.libelle !==
+                                                                        formData.emplacement_destination
+                                                                }
+                                                            >
+                                                                {caisson.libelle}
+                                                                {caisson.typeChambre ===
+                                                                "individuelle"
+                                                                    ? " (individuelle)"
+                                                                    : ""}
+                                                                {!caisson.disponible
+                                                                    ? " — occupé"
+                                                                    : ""}
+                                                            </option>
+                                                        )
+                                                    )}
+                                                </optgroup>
+                                            )}
+
+                                            {optionsDestination.anciens.length >
+                                                0 && (
+                                                <optgroup label="Anciens emplacements">
+                                                    {optionsDestination.anciens.map(
+                                                        (ancien) => (
+                                                            <option
+                                                                key={`ancien-${ancien.libelle}`}
+                                                                value={
+                                                                    ancien.libelle
+                                                                }
+                                                            >
+                                                                {ancien.libelle}
+                                                            </option>
+                                                        )
+                                                    )}
+                                                </optgroup>
+                                            )}
                                         </select>
 
-                                        {emplacements.length === 0 && (
-                                            <small className="form-warning">
-                                                Aucun emplacement enregistré
-                                                dans les dépôts.
-                                            </small>
-                                        )}
+                                        {optionsDestination.caissons.length ===
+                                            0 &&
+                                            optionsDestination.anciens
+                                                .length === 0 && (
+                                                <small className="form-warning">
+                                                    Aucun emplacement
+                                                    disponible. Créez d'abord
+                                                    des caissons dans
+                                                    Emplacements.
+                                                </small>
+                                            )}
                                     </div>
                                 )}
 

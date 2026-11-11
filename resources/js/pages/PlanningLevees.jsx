@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "./PlanningLevees.css";
+import Pagination from "../components/Pagination";
+import { usePagination } from "../utils/usePagination";
 import api, { asList } from "../services/api";
 
 /* =====================================================
@@ -386,6 +388,11 @@ function PlanningLevees() {
         });
     }, [leveesDeLaSemaine, search, chapelleFilter]);
 
+    const paginationLevees = usePagination(leveesFiltrees, {
+        tailleInitiale: 10,
+        resetKey: `${offsetSemaine}::${search}::${chapelleFilter}`,
+    });
+
     /* =====================================================
        NAVIGATION SEMAINES
     ===================================================== */
@@ -536,7 +543,7 @@ function PlanningLevees() {
                             : "AUCUNE LEVÉE POUR CETTE SEMAINE"}
                     </div>
                 ) : (
-                    leveesFiltrees.map((levee) => {
+                    paginationLevees.items.map((levee) => {
                         const statut = getStatutLevee(levee);
 
                         return (
@@ -585,6 +592,18 @@ function PlanningLevees() {
                             </div>
                         );
                     })
+                )}
+
+                {!loading && leveesFiltrees.length > 0 && (
+                    <Pagination
+                        page={paginationLevees.page}
+                        pages={paginationLevees.pages}
+                        total={paginationLevees.total}
+                        taille={paginationLevees.taille}
+                        onPage={paginationLevees.setPage}
+                        onTaille={paginationLevees.setTaille}
+                        element="levée"
+                    />
                 )}
 
                 <div className="levees-footer">

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Caisson;
 use App\Models\Depot;
 use App\Models\Transfert;
 use Illuminate\Http\Request;
@@ -63,20 +64,28 @@ if ($depot && $depot->scelle) {
             if ($validated['type'] === 'interne') {
 
                 /* ---------- TRANSFERT INTERNE ---------- */
-                if (empty($validated['emplacement_destination'])) {
+                $caisson = !empty($validated['caisson_id'])
+                    ? $this->caissonDestination((int) $validated['caisson_id'], $depot)
+                    : null;
+
+                if (!$caisson && empty($validated['emplacement_destination'])) {
                     throw ValidationException::withMessages([
                         'emplacement_destination' =>
                             'Le nouvel emplacement est obligatoire pour un transfert interne.',
                     ]);
                 }
 
-                $payload['emplacement_destination'] =
-                    trim($validated['emplacement_destination']);
+                $emplacement = $caisson
+                    ? $this->libelleEmplacement($caisson)
+                    : trim($validated['emplacement_destination']);
+
+                $payload['emplacement_destination'] = $emplacement;
                 $payload['destination'] = null;
 
-                /* Mettre à jour l'emplacement du dépôt */
+                /* Mettre à jour l'emplacement du dépôt et son caisson */
                 $depot->update([
-                    'emplacement' => $payload['emplacement_destination'],
+                    'emplacement' => $emplacement,
+                    'caisson_id'  => $caisson?->id,
                 ]);
 
             } else {
@@ -145,19 +154,27 @@ if ($depot && $depot->scelle) {
 
             if ($validated['type'] === 'interne') {
 
-                if (empty($validated['emplacement_destination'])) {
+                $caisson = !empty($validated['caisson_id'])
+                    ? $this->caissonDestination((int) $validated['caisson_id'], $depot)
+                    : null;
+
+                if (!$caisson && empty($validated['emplacement_destination'])) {
                     throw ValidationException::withMessages([
                         'emplacement_destination' =>
                             'Le nouvel emplacement est obligatoire pour un transfert interne.',
                     ]);
                 }
 
-                $payload['emplacement_destination'] =
-                    trim($validated['emplacement_destination']);
+                $emplacement = $caisson
+                    ? $this->libelleEmplacement($caisson)
+                    : trim($validated['emplacement_destination']);
+
+                $payload['emplacement_destination'] = $emplacement;
                 $payload['destination'] = null;
 
                 $depot->update([
-                    'emplacement' => $payload['emplacement_destination'],
+                    'emplacement' => $emplacement,
+                    'caisson_id'  => $caisson?->id,
                 ]);
 
             } else {
@@ -222,8 +239,57 @@ if ($depot && $depot->scelle) {
             'date'                    => 'required|date',
             'heure'                   => 'required',
             'emplacement_destination' => 'nullable|string|max:255',
+            'caisson_id'              => 'nullable|integer|exists:caissons,id',
             'destination'             => 'nullable|string|max:255',
             'statut'                  => 'nullable|in:EN ATTENTE,VALIDÉ',
         ];
+    }
+
+    /* =========================================================
+       CAISSON DE DESTINATION
+    ========================================================= */
+
+    private function libelleEmplacement(Caisson $caisson): string
+    {
+        $nomChambre = $caisson->chambreFroide?->nom;
+
+        return $nomChambre
+            ? "{$nomChambre} · {$caisson->code}"
+            : $caisson->code;
+    }
+
+    private function caissonDestination(int $caissonId, Depot $depot): Caisson
+    {
+        $caisson = Caisson::with('chambreFroide')->find($caissonId);
+
+        if (!$caisson) {
+            abort(response()->json([
+                'message' => 'Caisson invalide.',
+                'errors'  => ['caisson_id' => ['Le caisson sélectionné est introuvable.']],
+            ], 422));
+        }
+
+        if (!$caisson->actif || !$caisson->chambreFroide?->actif) {
+            abort(response()->json([
+                'message' => "Le caisson {$caisson->code} est désactivé : il ne peut pas être attribué.",
+                'errors'  => ['caisson_id' => ['Ce caisson est désactivé.']],
+            ], 422));
+        }
+
+        if ($caisson->chambreFroide->type === 'individuelle') {
+            $occupe = Depot::where('caisson_id', $caisson->id)
+                ->whereKeyNot($depot->id)
+                ->presents()
+                ->exists();
+
+            if ($occupe) {
+                abort(response()->json([
+                    'message' => "Le caisson {$caisson->code} est déjà occupé. Une chambre individuelle ne peut accueillir qu'un seul corps.",
+                    'errors'  => ['caisson_id' => ['Ce caisson est déjà occupé.']],
+                ], 422));
+            }
+        }
+
+        return $caisson;
     }
 }

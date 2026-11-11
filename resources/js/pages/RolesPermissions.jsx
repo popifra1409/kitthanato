@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import Pagination from "../components/Pagination";
+import { usePagination } from "../utils/usePagination";
 import api, { asList } from "../services/api";
 import { hasPermission } from "../services/session";
 
@@ -149,6 +151,11 @@ function RolesPermissions({ onChange, showNotif, openConfirm }) {
         });
     };
 
+    const paginationRoles = usePagination(roles, {
+        tailleInitiale: 10,
+        resetKey: "roles",
+    });
+
     return (
         <section className="param-section roles-section">
             <div className="section-title">
@@ -276,7 +283,7 @@ function RolesPermissions({ onChange, showNotif, openConfirm }) {
                             </tr>
                         )}
                         {!chargement &&
-                            roles.map((role) => (
+                            paginationRoles.items.map((role) => (
                                 <tr key={role.id}>
                                     <td>
                                         <strong>{role.libelle}</strong>
@@ -315,6 +322,18 @@ function RolesPermissions({ onChange, showNotif, openConfirm }) {
                     </tbody>
                 </table>
             </div>
+
+            {!chargement && roles.length > 0 && (
+                <Pagination
+                    page={paginationRoles.page}
+                    pages={paginationRoles.pages}
+                    total={paginationRoles.total}
+                    taille={paginationRoles.taille}
+                    onPage={paginationRoles.setPage}
+                    onTaille={paginationRoles.setTaille}
+                    element="rôle"
+                />
+            )}
         </section>
     );
 }

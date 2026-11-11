@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "./Corbeille.css";
+import Pagination from "../components/Pagination";
+import { usePagination } from "../utils/usePagination";
 
 import api, { asList } from "../services/api";
 
@@ -54,6 +56,11 @@ function Corbeille() {
             return texte.includes(terme);
         });
     }, [elements, recherche, typeFiltre]);
+
+    const paginationCorbeille = usePagination(elementsFiltres, {
+        tailleInitiale: 10,
+        resetKey: `${recherche}::${typeFiltre}`,
+    });
 
     /* FORMAT DATE */
     const formatDate = (date) => {
@@ -152,6 +159,7 @@ function Corbeille() {
                     Aucun élément supprimé.
                 </div>
             ) : (
+                <>
                 <div className="settings-table-wrapper">
                     <table className="settings-table">
                         <thead>
@@ -165,7 +173,7 @@ function Corbeille() {
                         </thead>
 
                         <tbody>
-                            {elementsFiltres.map((el) => (
+                            {paginationCorbeille.items.map((el) => (
                                 <tr key={el.id}>
                                     <td>{formatDate(el.created_at)}</td>
 
@@ -208,6 +216,17 @@ function Corbeille() {
                         </tbody>
                     </table>
                 </div>
+
+                <Pagination
+                    page={paginationCorbeille.page}
+                    pages={paginationCorbeille.pages}
+                    total={paginationCorbeille.total}
+                    taille={paginationCorbeille.taille}
+                    onPage={paginationCorbeille.setPage}
+                    onTaille={paginationCorbeille.setTaille}
+                    element="élément"
+                />
+                </>
             )}
 
             {/* MODALE DÉTAIL */}

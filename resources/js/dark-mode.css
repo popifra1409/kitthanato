@@ -355,3 +355,89 @@
 .dark-mode ::-webkit-scrollbar-thumb:hover {
     background: #5b21b6;
 }
+/* =============================================================
+   STATISTIQUES — TABLEAUX ET FIGURES
+============================================================= */
+
+.dark-mode .stats-table thead th {
+    background: #1a1226 !important;
+    color: var(--dm-text-soft) !important;
+    border-bottom-color: var(--dm-border) !important;
+}
+
+.dark-mode .stats-table tbody td {
+    color: var(--dm-text) !important;
+    border-bottom-color: var(--dm-border) !important;
+}
+
+.dark-mode .stats-table tbody tr:nth-child(even) {
+    background: #201730 !important;
+}
+
+.dark-mode .stats-table tbody tr:hover {
+    background: #2a1f3d !important;
+}
+
+.dark-mode .stats-table .stats-libelle {
+    color: var(--dm-text) !important;
+}
+
+.dark-mode .stats-table tfoot td {
+    background: #2a1f3d !important;
+    color: var(--dm-accent) !important;
+    border-top-color: var(--dm-border) !important;
+}
+
+.dark-mode .stats-table .stats-part,
+.dark-mode .stats-subtitle,
+.dark-mode .stats-figure > strong,
+.dark-mode .stats-progress-label strong {
+    color: var(--dm-accent) !important;
+}
+
+.dark-mode .stats-table .stats-positif {
+    color: #6ee7b7 !important;
+}
+
+.dark-mode .stats-table .stats-alerte {
+    color: #fbbf24 !important;
+}
+
+.dark-mode .stats-figure {
+    background: #1a1226 !important;
+    border-color: var(--dm-border) !important;
+}
+
+.dark-mode .stats-figure > span,
+.dark-mode .stats-figure > small,
+.dark-mode .stats-note,
+.dark-mode .stats-progress-label span {
+    color: var(--dm-text-soft) !important;
+}
+
+.dark-mode .stats-barre {
+    background: #342548 !important;
+}
+
+.dark-mode .stats-empty {
+    background: #1a1226 !important;
+    border-color: var(--dm-border) !important;
+    color: var(--dm-text-soft) !important;
+}
+
+.dark-mode .stat-actions button {
+    background: #1a1226 !important;
+    border-color: var(--dm-border) !important;
+    color: var(--dm-accent) !important;
+}
+
+.dark-mode .stat-actions button:hover {
+    background: #2a1f3d !important;
+}
+
+.dark-mode .stats-period select,
+.dark-mode .stats-period input {
+    background: #1a1226 !important;
+    border-color: var(--dm-border) !important;
+    color: var(--dm-text) !important;
+}

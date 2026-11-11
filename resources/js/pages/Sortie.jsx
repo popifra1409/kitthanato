@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import "./Sortie.css";
 import ConfirmDialog from "../components/ConfirmDialog";
 import NotificationBox from "../components/NotificationBox";
+import Pagination from "../components/Pagination";
+import { usePagination } from "../utils/usePagination";
 
 import api, { asList } from "../services/api";
 import { hasPermission } from "../services/session";
@@ -241,6 +243,8 @@ export default function Sortie() {
         duree_levee: 60,
         prestations: [],
     });
+    const [enregistrement, setEnregistrement] = useState(false);
+    const [paiementEnCours, setPaiementEnCours] = useState(false);
 
     /* ---------- Confirmation ---------- */
     const [confirmOpen, setConfirmOpen] = useState(false);
@@ -665,6 +669,11 @@ export default function Sortie() {
         });
     }, [sorties, recherche, filtreStatut]);
 
+    const paginationSorties = usePagination(sortiesFiltrees, {
+        tailleInitiale: 10,
+        resetKey: `${recherche}::${filtreStatut}`,
+    });
+
     /* =====================================================
        SÉLECTION DÉFUNT
     ===================================================== */
@@ -813,6 +822,8 @@ export default function Sortie() {
     const enregistrerSortie = async (event) => {
         event.preventDefault();
 
+        if (enregistrement) return;
+
         if (!form.depot_id) {
             showNotif(
                 "error",
@@ -902,6 +913,8 @@ export default function Sortie() {
         };
 
         try {
+            setEnregistrement(true);
+
             if (form.id) {
                 await api.sorties.update(form.id, donnees);
 
@@ -938,6 +951,8 @@ export default function Sortie() {
                 "Impossible d'enregistrer la sortie.";
 
             showNotif("error", "Échec", messageErreur);
+        } finally {
+            setEnregistrement(false);
         }
     };
 
@@ -974,6 +989,7 @@ export default function Sortie() {
         event.preventDefault();
 
         if (!sortiePaiement) return;
+        if (paiementEnCours) return;
 
         const montant = Number(montantPaiement);
         const total = nombre(sortiePaiement.montant_total);
@@ -1001,6 +1017,7 @@ export default function Sortie() {
         }
 
         try {
+            setPaiementEnCours(true);
             await api.sorties.paiement(sortiePaiement.id, montant);
 
             setShowPaiement(false);
@@ -1023,6 +1040,8 @@ export default function Sortie() {
                 error.firstMessage ||
                     "Impossible d'enregistrer le paiement."
             );
+        } finally {
+            setPaiementEnCours(false);
         }
     };
 
@@ -1318,6 +1337,7 @@ export default function Sortie() {
                         <h3>Aucune sortie trouvée</h3>
                     </div>
                 ) : (
+                    <>
                     <div className="table-wrapper">
                         <table className="sortie-table">
                             <colgroup>
@@ -1349,7 +1369,7 @@ export default function Sortie() {
                             </thead>
 
                             <tbody>
-                                {sortiesFiltrees.map((sortie) => {
+                                {paginationSorties.items.map((sortie) => {
                                     const total = nombre(sortie.montant_total);
                                     const paye = nombre(sortie.montant_paye);
                                     const reste = Math.max(total - paye, 0);
@@ -1592,6 +1612,16 @@ export default function Sortie() {
                             </tbody>
                         </table>
                     </div>
+                    <Pagination
+                        page={paginationSorties.page}
+                        pages={paginationSorties.pages}
+                        total={paginationSorties.total}
+                        taille={paginationSorties.taille}
+                        onPage={paginationSorties.setPage}
+                        onTaille={paginationSorties.setTaille}
+                        element="sortie"
+                    />
+                    </>
                 )}
             </div>
 
@@ -2025,10 +2055,14 @@ export default function Sortie() {
                                     type="submit"
                                     className="btn-primary"
                                     disabled={
-                                        !!form.chapelle_id && !!conflitChapelle
+                                        enregistrement ||
+                                        (!!form.chapelle_id &&
+                                            !!conflitChapelle)
                                     }
                                 >
-                                    {form.id
+                                    {enregistrement
+                                        ? "Enregistrement..."
+                                        : form.id
                                         ? "Enregistrer les modifications"
                                         : "Enregistrer la sortie"}
                                 </button>
@@ -2141,8 +2175,11 @@ export default function Sortie() {
                                 <button
                                     type="submit"
                                     className="btn-primary payment-submit"
+                                    disabled={paiementEnCours}
                                 >
-                                    Enregistrer le paiement
+                                    {paiementEnCours
+                                        ? "Enregistrement..."
+                                        : "Enregistrer le paiement"}
                                 </button>
                             </div>
                         </form>

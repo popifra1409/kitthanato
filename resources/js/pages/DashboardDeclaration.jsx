@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import "./DashboardDeclaration.css";
 import DeclarationDeces from "./DeclarationDeces";
+import Pagination from "../components/Pagination";
+import { usePagination } from "../utils/usePagination";
 
 import api, { asList } from "../services/api";
 import { hasPermission } from "../services/session";
@@ -433,6 +435,11 @@ export default function DashboardDeclaration() {
         });
     }, [declarations, recherche, filtreStatut]);
 
+    const paginationDeclarations = usePagination(declarationsFiltrees, {
+        tailleInitiale: 10,
+        resetKey: `${recherche}::${filtreStatut}`,
+    });
+
     /* =====================================================
        IMPRESSION → utilise DeclarationDeces
     ===================================================== */
@@ -567,6 +574,7 @@ useEffect(() => {
                         </p>
                     </div>
                 ) : (
+                    <>
                     <div className="declaration-table-wrapper">
                         <table className="declaration-table">
                             <thead>
@@ -583,7 +591,7 @@ useEffect(() => {
                             </thead>
 
                             <tbody>
-                                {declarationsFiltrees.map((declaration) => (
+                                {paginationDeclarations.items.map((declaration) => (
                                     <tr key={declaration.id}>
                                         <td>
                                             <span className="numero-badge">
@@ -658,6 +666,17 @@ useEffect(() => {
                             </tbody>
                         </table>
                     </div>
+
+                    <Pagination
+                        page={paginationDeclarations.page}
+                        pages={paginationDeclarations.pages}
+                        total={paginationDeclarations.total}
+                        taille={paginationDeclarations.taille}
+                        onPage={paginationDeclarations.setPage}
+                        onTaille={paginationDeclarations.setTaille}
+                        element="déclaration"
+                    />
+                    </>
                 )}
             </div>
 

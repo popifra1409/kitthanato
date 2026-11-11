@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import "./Parametres.css";
 import ConfirmDialog from "../components/ConfirmDialog";
 import NotificationBox from "../components/NotificationBox";
+import Pagination from "../components/Pagination";
+import { usePagination } from "../utils/usePagination";
 import Corbeille from "./Corbeille";
 import RolesPermissions from "./RolesPermissions";
 import api, { asList } from "../services/api";
@@ -13,7 +15,7 @@ function Parametres() {
        GESTION DE L'URL (section)
     ===================================================== */
 
-    const [searchParams, setSearchParams] = useSearchParams();
+    const [searchParams] = useSearchParams();
 
     /* Onglet initial = ?section= de l'URL ou "utilisateurs" */
     const sectionUrl = searchParams.get("section") || "utilisateurs";
@@ -24,12 +26,6 @@ function Parametres() {
     useEffect(() => {
         setOnglet(sectionUrl);
     }, [sectionUrl]);
-
-    /* Changer d'onglet → mettre à jour l'URL */
-    const changerOnglet = (nouvelOnglet) => {
-        setOnglet(nouvelOnglet);
-        setSearchParams({ section: nouvelOnglet });
-    };
 
     /* =====================================================
        ÉTATS
@@ -42,8 +38,6 @@ function Parametres() {
     const [historique, setHistorique] = useState([]);
     const [roles, setRoles] = useState([]);
     const [filtreModule, setFiltreModule] = useState("");
-
-    const [loading, setLoading] = useState(false);
 
     /* --- Modale de confirmation --- */
     const [confirmOpen, setConfirmOpen] = useState(false);
@@ -73,6 +67,7 @@ function Parametres() {
         is_active: true,
     });
     const [editingUserId, setEditingUserId] = useState(null);
+    const [enregistrement, setEnregistrement] = useState(false);
 
     const [prestationForm, setPrestationForm] = useState({
         nom: "",
@@ -159,6 +154,9 @@ function Parametres() {
     const enregistrerUtilisateur = async (e) => {
         e.preventDefault();
 
+        if (enregistrement) return;
+        setEnregistrement(true);
+
         try {
             if (editingUserId) {
                 await api.utilisateurs.update(editingUserId, userForm);
@@ -176,6 +174,8 @@ function Parametres() {
             chargerUtilisateurs();
         } catch (error) {
             showNotif("error", "Échec", messageErreur(error, "Erreur lors de l'enregistrement."));
+        } finally {
+            setEnregistrement(false);
         }
     };
 
@@ -252,17 +252,17 @@ function Parametres() {
 
     const chargerPrestations = async () => {
         try {
-            setLoading(true);
             setPrestations(asList(await api.prestations.listAdmin()));
         } catch (error) {
             showNotif("error", "Erreur", messageErreur(error, "Impossible de charger les prestations."));
-        } finally {
-            setLoading(false);
         }
     };
 
     const enregistrerPrestation = async (e) => {
         e.preventDefault();
+
+        if (enregistrement) return;
+        setEnregistrement(true);
 
         const donnees = {
             nom: prestationForm.nom,
@@ -286,6 +286,8 @@ function Parametres() {
             chargerPrestations();
         } catch (error) {
             showNotif("error", "Échec", messageErreur(error, "Erreur prestation."));
+        } finally {
+            setEnregistrement(false);
         }
     };
 
@@ -338,6 +340,9 @@ function Parametres() {
     const enregistrerChapelle = async (e) => {
         e.preventDefault();
 
+        if (enregistrement) return;
+        setEnregistrement(true);
+
         const donnees = {
             nom: chapelleForm.nom,
             prix: Number(chapelleForm.prix),
@@ -360,6 +365,8 @@ function Parametres() {
             chargerChapelles();
         } catch (error) {
             showNotif("error", "Échec", messageErreur(error, "Erreur chapelle."));
+        } finally {
+            setEnregistrement(false);
         }
     };
 
@@ -417,6 +424,9 @@ function Parametres() {
             return;
         }
 
+        if (enregistrement) return;
+        setEnregistrement(true);
+
         try {
             await api.services.create(nouveauService.trim());
 
@@ -430,6 +440,8 @@ function Parametres() {
             chargerServices();
         } catch (error) {
             showNotif("error", "Échec", messageErreur(error, "Erreur ajout service."));
+        } finally {
+            setEnregistrement(false);
         }
     };
 
@@ -496,6 +508,27 @@ function Parametres() {
     /* =====================================================
        AFFICHAGE
     ===================================================== */
+
+    const paginationUtilisateurs = usePagination(utilisateurs, {
+        tailleInitiale: 10,
+        resetKey: "utilisateurs",
+    });
+    const paginationPrestations = usePagination(prestations, {
+        tailleInitiale: 10,
+        resetKey: "prestations",
+    });
+    const paginationChapelles = usePagination(chapelles, {
+        tailleInitiale: 10,
+        resetKey: "chapelles",
+    });
+    const paginationServices = usePagination(services, {
+        tailleInitiale: 10,
+        resetKey: "services",
+    });
+    const paginationHistorique = usePagination(historique, {
+        tailleInitiale: 10,
+        resetKey: `${rechercheHistorique}::${filtreModule}`,
+    });
 
     return (
         <div className="parametres-page">
@@ -622,8 +655,14 @@ function Parametres() {
                             />
                         </div>
 
-                        <button className="primary-button" type="submit">
-                            {editingUserId
+                        <button
+                            className="primary-button"
+                            type="submit"
+                            disabled={enregistrement}
+                        >
+                            {enregistrement
+                                ? "Enregistrement..."
+                                : editingUserId
                                 ? "Modifier le compte"
                                 : "Créer le compte"}
                         </button>
@@ -642,7 +681,7 @@ function Parametres() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {utilisateurs.map((user) => (
+                                {paginationUtilisateurs.items.map((user) => (
                                     <tr key={user.id}>
                                         <td>{user.name}</td>
                                         <td>
@@ -709,6 +748,16 @@ function Parametres() {
                             </tbody>
                         </table>
                     </div>
+
+                    <Pagination
+                        page={paginationUtilisateurs.page}
+                        pages={paginationUtilisateurs.pages}
+                        total={paginationUtilisateurs.total}
+                        taille={paginationUtilisateurs.taille}
+                        onPage={paginationUtilisateurs.setPage}
+                        onTaille={paginationUtilisateurs.setTaille}
+                        element="compte"
+                    />
                 </section>
             )}
 
@@ -767,8 +816,16 @@ function Parametres() {
                             />
                         </div>
 
-                        <button className="primary-button" type="submit">
-                            {editingPrestationId ? "Modifier" : "Ajouter"}
+                        <button
+                            className="primary-button"
+                            type="submit"
+                            disabled={enregistrement}
+                        >
+                            {enregistrement
+                                ? "Enregistrement..."
+                                : editingPrestationId
+                                ? "Modifier"
+                                : "Ajouter"}
                         </button>
                     </form>
 
@@ -783,7 +840,7 @@ function Parametres() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {prestations.map((prestation) => (
+                                {paginationPrestations.items.map((prestation) => (
                                     <tr key={prestation.id}>
                                         <td>{prestation.nom}</td>
                                         <td>
@@ -826,6 +883,16 @@ function Parametres() {
                             </tbody>
                         </table>
                     </div>
+
+                    <Pagination
+                        page={paginationPrestations.page}
+                        pages={paginationPrestations.pages}
+                        total={paginationPrestations.total}
+                        taille={paginationPrestations.taille}
+                        onPage={paginationPrestations.setPage}
+                        onTaille={paginationPrestations.setTaille}
+                        element="prestation"
+                    />
                 </section>
             )}
 
@@ -884,8 +951,16 @@ function Parametres() {
                             />
                         </div>
 
-                        <button className="primary-button" type="submit">
-                            {editingChapelleId ? "Modifier" : "Ajouter"}
+                        <button
+                            className="primary-button"
+                            type="submit"
+                            disabled={enregistrement}
+                        >
+                            {enregistrement
+                                ? "Enregistrement..."
+                                : editingChapelleId
+                                ? "Modifier"
+                                : "Ajouter"}
                         </button>
                     </form>
 
@@ -900,7 +975,7 @@ function Parametres() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {chapelles.map((chapelle) => (
+                                {paginationChapelles.items.map((chapelle) => (
                                     <tr key={chapelle.id}>
                                         <td>{chapelle.nom}</td>
                                         <td>
@@ -941,6 +1016,16 @@ function Parametres() {
                             </tbody>
                         </table>
                     </div>
+
+                    <Pagination
+                        page={paginationChapelles.page}
+                        pages={paginationChapelles.pages}
+                        total={paginationChapelles.total}
+                        taille={paginationChapelles.taille}
+                        onPage={paginationChapelles.setPage}
+                        onTaille={paginationChapelles.setTaille}
+                        element="chapelle"
+                    />
                 </section>
             )}
 
@@ -969,8 +1054,12 @@ function Parametres() {
                             />
                         </div>
 
-                        <button className="primary-button" type="submit">
-                            Ajouter
+                        <button
+                            className="primary-button"
+                            type="submit"
+                            disabled={enregistrement}
+                        >
+                            {enregistrement ? "Enregistrement..." : "Ajouter"}
                         </button>
                     </form>
 
@@ -983,7 +1072,7 @@ function Parametres() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {services.map((service) => (
+                                {paginationServices.items.map((service) => (
                                     <tr key={service.id}>
                                         <td>🏥 {service.nom}</td>
                                         <td>
@@ -1008,6 +1097,18 @@ function Parametres() {
                             </tbody>
                         </table>
                     </div>
+
+                    {services.length > 0 && (
+                        <Pagination
+                            page={paginationServices.page}
+                            pages={paginationServices.pages}
+                            total={paginationServices.total}
+                            taille={paginationServices.taille}
+                            onPage={paginationServices.setPage}
+                            onTaille={paginationServices.setTaille}
+                            element="service"
+                        />
+                    )}
                 </section>
             )}
 
@@ -1059,7 +1160,7 @@ function Parametres() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {historique.map((log) => (
+                                {paginationHistorique.items.map((log) => (
                                     <tr key={log.id}>
                                         <td>
                                             {new Date(
@@ -1084,6 +1185,16 @@ function Parametres() {
                             </tbody>
                         </table>
                     </div>
+
+                    <Pagination
+                        page={paginationHistorique.page}
+                        pages={paginationHistorique.pages}
+                        total={paginationHistorique.total}
+                        taille={paginationHistorique.taille}
+                        onPage={paginationHistorique.setPage}
+                        onTaille={paginationHistorique.setTaille}
+                        element="entrée"
+                    />
                 </section>
             )}
 
