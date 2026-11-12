@@ -91,6 +91,65 @@ const deposantVide = () => ({
     lien_parente: "",
 });
 
+/* =========================================================
+   LIENS DE PARENTÉ
+   Les liens ajoutés via « Autre » sont conservés d'une
+   session à l'autre dans le navigateur.
+========================================================= */
+const LIENS_PARENTE_BASE = [
+    "Père",
+    "Mère",
+    "Époux(se)",
+    "Fils",
+    "Fille",
+    "Frère",
+    "Sœur",
+    "Oncle",
+    "Tante",
+];
+
+const CLE_LIENS_PARENTE = "kitthanato.liens_parente";
+
+let liensParenteAjoutesCache = null;
+
+const liensParenteAjoutes = () => {
+    if (liensParenteAjoutesCache !== null) return liensParenteAjoutesCache;
+
+    try {
+        const valeur = JSON.parse(
+            window.localStorage.getItem(CLE_LIENS_PARENTE) || "[]"
+        );
+        liensParenteAjoutesCache = Array.isArray(valeur)
+            ? valeur.filter(
+                  (lien) => typeof lien === "string" && lien.trim()
+              )
+            : [];
+    } catch {
+        liensParenteAjoutesCache = [];
+    }
+
+    return liensParenteAjoutesCache;
+};
+
+const memoriserLienParente = (lien) => {
+    const texte = String(lien || "").trim();
+    if (!texte) return;
+
+    const connus = [...LIENS_PARENTE_BASE, ...liensParenteAjoutes()];
+    if (connus.some((c) => c.toLowerCase() === texte.toLowerCase())) return;
+
+    liensParenteAjoutesCache = [...liensParenteAjoutes(), texte];
+
+    try {
+        window.localStorage.setItem(
+            CLE_LIENS_PARENTE,
+            JSON.stringify(liensParenteAjoutesCache)
+        );
+    } catch {
+        /* Stockage indisponible : le lien reste utilisable pour ce dépôt. */
+    }
+};
+
 /* Libellé de l'emplacement : caisson structuré, sinon ancien box texte. */
 const libelleCaisson = (depot) => {
     if (depot?.caisson) {
@@ -208,17 +267,24 @@ function DepotCorps() {
     /* Déposants */
     const [deposants, setDeposants] = useState([]);
     const [deposantCourant, setDeposantCourant] = useState(deposantVide());
+    const [liensPersonnalises, setLiensPersonnalises] = useState(
+        liensParenteAjoutes
+    );
+    const [lienAutreActif, setLienAutreActif] = useState(false);
+    const [lienAutre, setLienAutre] = useState("");
 
     /* Box / caisson */
     const [boxOpen, setBoxOpen] = useState(false);
     const [boxDepot, setBoxDepot] = useState(null);
     const [boxCaisson, setBoxCaisson] = useState("");
+    const [boxChambre, setBoxChambre] = useState("");
     const [chambresCaissons, setChambresCaissons] = useState([]);
     const [boxChargement, setBoxChargement] = useState(false);
     const [boxLoading, setBoxLoading] = useState(false);
 
     /* Emplacements du formulaire (chambres → caissons) */
     const [chambresFormulaire, setChambresFormulaire] = useState([]);
+    const [chambreFormulaire, setChambreFormulaire] = useState("");
     const [chargementEmplacements, setChargementEmplacements] = useState(false);
 
     /* Chapelles du référentiel */
@@ -272,6 +338,31 @@ function DepotCorps() {
     const emplacementCalcule = caissonSelectionne
         ? `${caissonSelectionne.chambre.nom} · ${caissonSelectionne.code}`
         : formData.emplacement || "Non attribué";
+
+    /* Le caisson proposé dépend de la chambre froide sélectionnée. */
+    const chambreFormulaireChoisie = chambresFormulaire.find(
+        (chambre) => String(chambre.id) === String(chambreFormulaire)
+    );
+    const caissonsChambreFormulaire =
+        chambreFormulaireChoisie?.caissons || [];
+
+    const chambreBoxChoisie = chambresCaissons.find(
+        (chambre) => String(chambre.id) === String(boxChambre)
+    );
+    const caissonsBox = chambreBoxChoisie?.caissons || [];
+
+    /* Lien de parenté : « Autre » ouvre une saisie libre. */
+    const liensParenteProposes = [
+        ...LIENS_PARENTE_BASE,
+        ...liensPersonnalises,
+    ];
+    const lienParenteConnu =
+        !deposantCourant.lien_parente ||
+        liensParenteProposes.includes(deposantCourant.lien_parente);
+    const lienParenteValeur = 
+        lienAutreActif || !lienParenteConnu
+            ? "__autre__"
+            : deposantCourant.lien_parente;
 
     /* Prévisualisation du prochain code_defunt */
     const prochainDefuntPreview = useMemo(
@@ -613,6 +704,17 @@ function DepotCorps() {
 
     const handleDeposantChange = (e) => {
         const { name, value } = e.target;
+
+        if (name === "lien_parente") {
+            setLienAutreActif(value === "__autre__");
+            setLienAutre("");
+            setDeposantCourant((prev) => ({
+                ...prev,
+                lien_parente: value === "__autre__" ? "" : value,
+            }));
+            return;
+        }
+
         setDeposantCourant((prev) => ({ ...prev, [name]: value }));
     };
 
@@ -625,15 +727,37 @@ function DepotCorps() {
             );
             return;
         }
+
+        const lienParente = lienAutreActif
+            ? lienAutre.trim()
+            : deposantCourant.lien_parente;
+
+        if (lienAutreActif && !lienParente) {
+            showNotif(
+                "error",
+                "Champ manquant",
+                "Veuillez préciser le lien de parenté."
+            );
+            return;
+        }
+
+        if (lienAutreActif) {
+            memoriserLienParente(lienParente);
+            setLiensPersonnalises([...liensParenteAjoutes()]);
+        }
+
         setDeposants((prev) => [
             ...prev,
             {
                 ...deposantCourant,
                 nom: deposantCourant.nom.trim(),
+                lien_parente: lienParente,
                 statut: prev.length === 0 ? "principal" : "secondaire",
             },
         ]);
         setDeposantCourant(deposantVide());
+        setLienAutreActif(false);
+        setLienAutre("");
     };
 
     const definirPrincipal = (index) => {
@@ -660,12 +784,20 @@ function DepotCorps() {
 
     const corrigerDeposant = (index) => {
         const d = deposants[index];
+        const lien = d.lien_parente || "";
+        const lienLibre =
+            lien &&
+            !LIENS_PARENTE_BASE.includes(lien) &&
+            !liensPersonnalises.includes(lien);
+
         setDeposantCourant({
             nom: d.nom || "",
             telephone: d.telephone || "",
             cni: d.cni || "",
-            lien_parente: d.lien_parente || "",
+            lien_parente: lienLibre ? "" : lien,
         });
+        setLienAutreActif(Boolean(lienLibre));
+        setLienAutre(lienLibre ? lien : "");
         retirerDeposant(index);
     };
 
@@ -752,6 +884,9 @@ function DepotCorps() {
         setPrestationsSelectionnees([]);
         setDeposants([]);
         setDeposantCourant(deposantVide());
+        setLienAutreActif(false);
+        setLienAutre("");
+        setChambreFormulaire("");
         setCurrentStep(1);
     };
 
@@ -862,6 +997,12 @@ function DepotCorps() {
             chapelle: depot.chapelle || "",
         });
 
+        setChambreFormulaire(
+            depot.caisson?.chambre_froide?.id
+                ? String(depot.caisson.chambre_froide.id)
+                : ""
+        );
+
         chargerEmplacements();
         setShowForm(true);
     };
@@ -890,10 +1031,26 @@ function DepotCorps() {
 
         let listeFinale = [...deposants];
 
+        const lienParenteCourant = lienAutreActif
+            ? lienAutre.trim()
+            : deposantCourant.lien_parente;
+
+        if (deposantCourant.nom.trim() && lienAutreActif && !lienParenteCourant) {
+            showNotif(
+                "error",
+                "Champ manquant",
+                "Veuillez préciser le lien de parenté."
+            );
+            return;
+        }
+
         if (deposantCourant.nom.trim()) {
+            if (lienAutreActif) memoriserLienParente(lienParenteCourant);
+
             listeFinale.push({
                 ...deposantCourant,
                 nom: deposantCourant.nom.trim(),
+                lien_parente: lienParenteCourant,
                 statut:
                     listeFinale.length === 0 ? "principal" : "secondaire",
             });
@@ -1024,12 +1181,28 @@ function DepotCorps() {
         }
         setBoxDepot(depot);
         setBoxCaisson(depot.caisson_id ? String(depot.caisson_id) : "");
+        setBoxChambre(
+            depot.caisson?.chambre_froide?.id
+                ? String(depot.caisson.chambre_froide.id)
+                : ""
+        );
         setChambresCaissons([]);
         setBoxOpen(true);
         setBoxChargement(true);
         try {
             const reponse = await api.depots.caissonsDisponibles(depot.id);
-            setChambresCaissons(reponse?.chambres || []);
+            const chambres = reponse?.chambres || [];
+            setChambresCaissons(chambres);
+
+            if (!depot.caisson?.chambre_froide?.id && depot.caisson_id) {
+                const chambre = chambres.find((c) =>
+                    (c.caissons || []).some(
+                        (caisson) =>
+                            String(caisson.id) === String(depot.caisson_id)
+                    )
+                );
+                if (chambre) setBoxChambre(String(chambre.id));
+            }
         } catch (error) {
             console.error(error);
             showNotif(
@@ -1051,6 +1224,7 @@ function DepotCorps() {
         setBoxOpen(false);
         setBoxDepot(null);
         setBoxCaisson("");
+        setBoxChambre("");
         setChambresCaissons([]);
     };
 
@@ -1080,6 +1254,7 @@ function DepotCorps() {
             setBoxOpen(false);
             setBoxDepot(null);
             setBoxCaisson("");
+            setBoxChambre("");
             setChambresCaissons([]);
             showNotif(
                 "success",
@@ -1309,6 +1484,7 @@ function DepotCorps() {
                                 <th>Emplacement</th>
                                 <th>Chapelle</th>
                                 <th>Déposant</th>
+                                <th>Enregistré par</th>
                                 <th>Statut</th>
                                 <th>Actions</th>
                             </tr>
@@ -1317,13 +1493,13 @@ function DepotCorps() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan="11" className="table-loading">
+                                    <td colSpan="12" className="table-loading">
                                         Chargement des dépôts...
                                     </td>
                                 </tr>
                             ) : depotsFiltres.length === 0 ? (
                                 <tr>
-                                    <td colSpan="11" className="table-empty">
+                                    <td colSpan="12" className="table-empty">
                                         Aucun dépôt trouvé.
                                     </td>
                                 </tr>
@@ -1424,6 +1600,10 @@ function DepotCorps() {
                                                 CNI :{" "}
                                                 {depot.contact_cni || ""}
                                             </span>
+                                        </td>
+
+                                        <td className="enregistreur-cell">
+                                            {getNomEnregistreur(depot)}
                                         </td>
 
                                         <td>
@@ -1990,8 +2170,46 @@ function DepotCorps() {
                                             </select>
                                         </div>
 
-                                        <div className="form-group full-width">
-                                            <label>Caisson / emplacement</label>
+                                        <div className="form-group">
+                                            <label>Chambre froide</label>
+                                            <select
+                                                value={chambreFormulaire}
+                                                onChange={(e) => {
+                                                    setChambreFormulaire(
+                                                        e.target.value
+                                                    );
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        caisson_id: "",
+                                                    }));
+                                                }}
+                                                disabled={chargementEmplacements}
+                                            >
+                                                <option value="">
+                                                    {chargementEmplacements
+                                                        ? "Chargement..."
+                                                        : "— Sélectionner une chambre —"}
+                                                </option>
+                                                {chambresFormulaire.map(
+                                                    (chambre) => (
+                                                        <option
+                                                            key={chambre.id}
+                                                            value={chambre.id}
+                                                        >
+                                                            {chambre.nom} (
+                                                            {chambre.type ===
+                                                            "individuelle"
+                                                                ? "individuelle"
+                                                                : "commune"}
+                                                            )
+                                                        </option>
+                                                    )
+                                                )}
+                                            </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>Caisson</label>
                                             <select
                                                 name="caisson_id"
                                                 value={formData.caisson_id}
@@ -2002,59 +2220,42 @@ function DepotCorps() {
                                                             e.target.value,
                                                     }))
                                                 }
-                                                disabled={chargementEmplacements}
+                                                disabled={
+                                                    chargementEmplacements ||
+                                                    !chambreFormulaireChoisie
+                                                }
                                             >
                                                 <option value="">
                                                     {chargementEmplacements
                                                         ? "Chargement des caissons..."
+                                                        : !chambreFormulaireChoisie
+                                                        ? "— Sélectionnez d'abord une chambre —"
                                                         : "— Non attribué (à attribuer plus tard) —"}
                                                 </option>
-                                                {chambresFormulaire.map(
-                                                    (chambre) => (
-                                                        <optgroup
-                                                            key={chambre.id}
-                                                            label={`${
-                                                                chambre.nom
-                                                            } (${
-                                                                chambre.type ===
-                                                                "individuelle"
-                                                                    ? "individuelle"
-                                                                    : "commune"
-                                                            })`}
+                                                {caissonsChambreFormulaire.map(
+                                                    (caisson) => (
+                                                        <option
+                                                            key={caisson.id}
+                                                            value={caisson.id}
+                                                            disabled={
+                                                                !caisson.disponible &&
+                                                                String(
+                                                                    caisson.id
+                                                                ) !==
+                                                                    String(
+                                                                        formData.caisson_id
+                                                                    )
+                                                            }
                                                         >
-                                                            {chambre.caissons.map(
-                                                                (caisson) => (
-                                                                    <option
-                                                                        key={
-                                                                            caisson.id
-                                                                        }
-                                                                        value={
-                                                                            caisson.id
-                                                                        }
-                                                                        disabled={
-                                                                            !caisson.disponible &&
-                                                                            String(
-                                                                                caisson.id
-                                                                            ) !==
-                                                                                String(
-                                                                                    formData.caisson_id
-                                                                                )
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            caisson.code
-                                                                        }
-                                                                        {caisson.occupants >
-                                                                        0
-                                                                            ? caisson.capacite ===
-                                                                              1
-                                                                                ? " — occupé"
-                                                                                : ` — ${caisson.occupants} corps`
-                                                                            : " — libre"}
-                                                                    </option>
-                                                                )
-                                                            )}
-                                                        </optgroup>
+                                                            {caisson.code}
+                                                            {caisson.occupants >
+                                                            0
+                                                                ? caisson.capacite ===
+                                                                  1
+                                                                    ? " — occupé"
+                                                                    : ` — ${caisson.occupants} corps`
+                                                                : " — libre"}
+                                                        </option>
                                                     )
                                                 )}
                                             </select>
@@ -2062,7 +2263,9 @@ function DepotCorps() {
                                             <small className="form-help">
                                                 {caissonSelectionne
                                                     ? `Emplacement retenu : ${emplacementCalcule}`
-                                                    : "Le corps apparaîtra « Non attribué » dans la liste jusqu'à l'attribution d'un caisson."}
+                                                    : chambreFormulaireChoisie
+                                                    ? "Le corps apparaîtra « Non attribué » dans la liste jusqu'à l'attribution d'un caisson."
+                                                    : "Sélectionnez une chambre froide, puis un caisson, ou enregistrez le corps sans attribution."}
                                             </small>
 
                                             {!chargementEmplacements &&
@@ -2217,21 +2420,45 @@ function DepotCorps() {
                                             <label>Lien de parenté</label>
                                             <select
                                                 name="lien_parente"
-                                                value={deposantCourant.lien_parente}
+                                                value={lienParenteValeur}
                                                 onChange={handleDeposantChange}
                                             >
                                                 <option value="">Sélectionner</option>
-                                                <option value="Père">Père</option>
-                                                <option value="Mère">Mère</option>
-                                                <option value="Époux(se)">Époux(se)</option>
-                                                <option value="Fils">Fils</option>
-                                                <option value="Fille">Fille</option>
-                                                <option value="Frère">Frère</option>
-                                                <option value="Sœur">Sœur</option>
-                                                <option value="Oncle">Oncle</option>
-                                                <option value="Tante">Tante</option>
-                                                <option value="Autre">Autre</option>
+                                                {LIENS_PARENTE_BASE.map((lien) => (
+                                                    <option
+                                                        key={lien}
+                                                        value={lien}
+                                                    >
+                                                        {lien}
+                                                    </option>
+                                                ))}
+                                                {liensPersonnalises.map((lien) => (
+                                                    <option
+                                                        key={lien}
+                                                        value={lien}
+                                                    >
+                                                        {lien}
+                                                    </option>
+                                                ))}
+                                                <option value="__autre__">
+                                                    Autre…
+                                                </option>
                                             </select>
+
+                                            {lienAutreActif && (
+                                                <input
+                                                    type="text"
+                                                    value={lienAutre}
+                                                    onChange={(e) =>
+                                                        setLienAutre(
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    placeholder="Précisez le lien de parenté"
+                                                    maxLength={100}
+                                                    autoFocus
+                                                />
+                                            )}
                                         </div>
                                     </div>
 
@@ -2313,45 +2540,69 @@ function DepotCorps() {
                                 {boxDepot.nom} {boxDepot.prenom} — {boxDepot.code}
                             </p>
                             <div className="form-group">
-                                <label>Caisson *</label>
+                                <label>Chambre froide *</label>
                                 <select
-                                    value={boxCaisson}
-                                    onChange={(e) => setBoxCaisson(e.target.value)}
+                                    value={boxChambre}
+                                    onChange={(e) => {
+                                        setBoxChambre(e.target.value);
+                                        setBoxCaisson("");
+                                    }}
                                     disabled={boxChargement || boxLoading}
                                     autoFocus
                                 >
                                     <option value="">
                                         {boxChargement
                                             ? "Chargement..."
-                                            : "— Sélectionner un caisson —"}
+                                            : "— Sélectionner une chambre —"}
                                     </option>
                                     {chambresCaissons.map((chambre) => (
-                                        <optgroup
+                                        <option
                                             key={chambre.id}
-                                            label={`${chambre.nom} (${
-                                                chambre.type === "individuelle"
-                                                    ? "individuelle"
-                                                    : "commune"
-                                            })`}
+                                            value={chambre.id}
                                         >
-                                            {chambre.caissons.map((caisson) => (
-                                                <option
-                                                    key={caisson.id}
-                                                    value={caisson.id}
-                                                    disabled={
-                                                        !caisson.disponible &&
-                                                        caisson.id !== boxDepot.caisson_id
-                                                    }
-                                                >
-                                                    {caisson.code}
-                                                    {caisson.occupants > 0
-                                                        ? caisson.capacite === 1
-                                                            ? " — occupé"
-                                                            : ` — ${caisson.occupants} corps`
-                                                        : " — libre"}
-                                                </option>
-                                            ))}
-                                        </optgroup>
+                                            {chambre.nom} (
+                                            {chambre.type === "individuelle"
+                                                ? "individuelle"
+                                                : "commune"}
+                                            )
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Caisson *</label>
+                                <select
+                                    value={boxCaisson}
+                                    onChange={(e) => setBoxCaisson(e.target.value)}
+                                    disabled={
+                                        boxChargement ||
+                                        boxLoading ||
+                                        !chambreBoxChoisie
+                                    }
+                                >
+                                    <option value="">
+                                        {boxChargement
+                                            ? "Chargement..."
+                                            : !chambreBoxChoisie
+                                            ? "— Sélectionnez d'abord une chambre —"
+                                            : "— Sélectionner un caisson —"}
+                                    </option>
+                                    {caissonsBox.map((caisson) => (
+                                        <option
+                                            key={caisson.id}
+                                            value={caisson.id}
+                                            disabled={
+                                                !caisson.disponible &&
+                                                caisson.id !== boxDepot.caisson_id
+                                            }
+                                        >
+                                            {caisson.code}
+                                            {caisson.occupants > 0
+                                                ? caisson.capacite === 1
+                                                    ? " — occupé"
+                                                    : ` — ${caisson.occupants} corps`
+                                                : " — libre"}
+                                        </option>
                                     ))}
                                 </select>
                             </div>

@@ -86,6 +86,10 @@ function Emplacements() {
     const [chargementCaissons, setChargementCaissons] = useState(false);
     const [actionCorps, setActionCorps] = useState(false);
 
+    /* Glisser-déposer des caissons dans le plan d'occupation */
+    const [dragCaissonId, setDragCaissonId] = useState(null);
+    const [dropCible, setDropCible] = useState(null);
+
     const showNotif = (type, title, message = "") =>
         setNotif({ type, title, message });
 
@@ -283,6 +287,55 @@ function Emplacements() {
                 "error",
                 "Échec",
                 messageErreur(error, "Impossible de mettre à jour le caisson.")
+            );
+        }
+    };
+
+    /* ---------- ORDRE DES CAISSONS (glisser-déposer) ---------- */
+
+    const deplacerCaisson = async (chambre, sourceId, cibleId, apres) => {
+        if (!sourceId || sourceId === cibleId) return;
+
+        const ids = chambre.caissons.map((caisson) => caisson.id);
+        if (!ids.includes(sourceId) || !ids.includes(cibleId)) return;
+
+        const ordre = ids.filter((id) => id !== sourceId);
+        const cible = ordre.indexOf(cibleId);
+        ordre.splice(cible + (apres ? 1 : 0), 0, sourceId);
+
+        if (ordre.every((id, index) => id === ids[index])) return;
+
+        const caissonsOrdonnes = ordre
+            .map((id) =>
+                chambre.caissons.find((caisson) => caisson.id === id)
+            )
+            .filter(Boolean);
+
+        const remplacerCaissons = (liste) =>
+            liste.map((c) =>
+                c.id === chambre.id
+                    ? { ...c, caissons: caissonsOrdonnes }
+                    : c
+            );
+
+        setPlan((actuel) =>
+            actuel
+                ? { ...actuel, chambres: remplacerCaissons(actuel.chambres) }
+                : actuel
+        );
+        setChambres(remplacerCaissons);
+
+        try {
+            await api.emplacements.caissons.reordonner(chambre.id, ordre);
+        } catch (error) {
+            await charger();
+            showNotif(
+                "error",
+                "Réorganisation impossible",
+                messageErreur(
+                    error,
+                    "L'ordre des caissons n'a pas été enregistré."
+                )
             );
         }
     };
@@ -513,6 +566,14 @@ function Emplacements() {
                                             </span>
                                         </header>
 
+                                        {peutGerer &&
+                                            chambre.caissons.length > 1 && (
+                                                <p className="emp-plan-aide">
+                                                    Glissez-déposez un caisson
+                                                    pour changer son ordre.
+                                                </p>
+                                            )}
+
                                         {chambre.caissons.length === 0 ? (
                                             <p className="emp-aucun-caisson">
                                                 Aucun caisson.
@@ -536,7 +597,122 @@ function Emplacements() {
                                                                     caisson.actif
                                                                         ? ""
                                                                         : "inactif"
+                                                                } ${
+                                                                    peutGerer
+                                                                        ? "deplacable"
+                                                                        : ""
+                                                                } ${
+                                                                    dragCaissonId ===
+                                                                    caisson.id
+                                                                        ? "en-deplacement"
+                                                                        : ""
+                                                                } ${
+                                                                    dropCible?.id ===
+                                                                    caisson.id
+                                                                        ? dropCible.apres
+                                                                            ? "drop-apres"
+                                                                            : "drop-avant"
+                                                                        : ""
                                                                 }`}
+                                                                draggable={
+                                                                    peutGerer
+                                                                }
+                                                                onDragStart={(
+                                                                    e
+                                                                ) => {
+                                                                    if (
+                                                                        !peutGerer
+                                                                    )
+                                                                        return;
+                                                                    setDragCaissonId(
+                                                                        caisson.id
+                                                                    );
+                                                                    e.dataTransfer.effectAllowed =
+                                                                        "move";
+                                                                    e.dataTransfer.setData(
+                                                                        "text/plain",
+                                                                        String(
+                                                                            caisson.id
+                                                                        )
+                                                                    );
+                                                                }}
+                                                                onDragOver={(
+                                                                    e
+                                                                ) => {
+                                                                    if (
+                                                                        !peutGerer ||
+                                                                        dragCaissonId ===
+                                                                            null ||
+                                                                        dragCaissonId ===
+                                                                            caisson.id
+                                                                    )
+                                                                        return;
+                                                                    e.preventDefault();
+                                                                    e.dataTransfer.dropEffect =
+                                                                        "move";
+                                                                    const rect =
+                                                                        e.currentTarget.getBoundingClientRect();
+                                                                    const apres =
+                                                                        e.clientX >
+                                                                        rect.left +
+                                                                            rect.width /
+                                                                                2;
+                                                                    setDropCible(
+                                                                        (
+                                                                            actuel
+                                                                        ) =>
+                                                                            actuel?.id ===
+                                                                                caisson.id &&
+                                                                            actuel?.apres ===
+                                                                                apres
+                                                                                ? actuel
+                                                                                : {
+                                                                                      id: caisson.id,
+                                                                                      apres,
+                                                                                  }
+                                                                    );
+                                                                }}
+                                                                onDragLeave={() =>
+                                                                    setDropCible(
+                                                                        (
+                                                                            actuel
+                                                                        ) =>
+                                                                            actuel?.id ===
+                                                                            caisson.id
+                                                                                ? null
+                                                                                : actuel
+                                                                    )
+                                                                }
+                                                                onDrop={(e) => {
+                                                                    if (
+                                                                        !peutGerer ||
+                                                                        dragCaissonId ===
+                                                                            null
+                                                                    )
+                                                                        return;
+                                                                    e.preventDefault();
+                                                                    const rect =
+                                                                        e.currentTarget.getBoundingClientRect();
+                                                                    const apres =
+                                                                        e.clientX >
+                                                                        rect.left +
+                                                                            rect.width /
+                                                                                2;
+                                                                    deplacerCaisson(
+                                                                        chambre,
+                                                                        dragCaissonId,
+                                                                        caisson.id,
+                                                                        apres
+                                                                    );
+                                                                }}
+                                                                onDragEnd={() => {
+                                                                    setDragCaissonId(
+                                                                        null
+                                                                    );
+                                                                    setDropCible(
+                                                                        null
+                                                                    );
+                                                                }}
                                                             >
                                                                 <span className="emp-plan-code">
                                                                     {caisson.code}

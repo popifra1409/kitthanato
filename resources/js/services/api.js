@@ -125,6 +125,8 @@ export const emplacements = {
     caissons: {
         update: (id, donnees) => put(`/caissons/${id}`, donnees),
         toggleActif: (id) => put(`/caissons/${id}/actif`, {}),
+        reordonner: (chambreId, caissons) =>
+            put(`/chambres-froides/${chambreId}/caissons/ordre`, { caissons }),
     },
 };
 

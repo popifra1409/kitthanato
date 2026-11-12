@@ -429,6 +429,14 @@
     gap: 10px;
 }
 
+.emp-plan-aide {
+    margin: -2px 0 10px;
+
+    color: var(--color-text-muted, #6b6478);
+    font-size: 12px;
+    font-weight: 600;
+}
+
 .emp-plan-caisson {
     position: relative;
 
@@ -472,6 +480,26 @@
         transparent 0 8px,
         rgba(0, 0, 0, 0.05) 8px 16px
     );
+}
+
+.emp-plan-caisson.deplacable {
+    cursor: grab;
+}
+
+.emp-plan-caisson.deplacable:active {
+    cursor: grabbing;
+}
+
+.emp-plan-caisson.en-deplacement {
+    opacity: 0.4;
+}
+
+.emp-plan-caisson.drop-avant {
+    box-shadow: inset 3px 0 0 #6d28d9;
+}
+
+.emp-plan-caisson.drop-apres {
+    box-shadow: inset -3px 0 0 #6d28d9;
 }
 
 body.dark-mode .emp-plan-caisson.libre {

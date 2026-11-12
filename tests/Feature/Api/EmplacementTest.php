@@ -8,6 +8,28 @@ use App\Models\Depot;
 
 class EmplacementTest extends ApiTestCase
 {
+    private function creerChambre(
+        string $nom,
+        string $type,
+        int $nombreCaissons
+    ): ChambreFroide {
+        $chambre = ChambreFroide::create([
+            'nom' => $nom,
+            'type' => $type,
+            'actif' => true,
+        ]);
+
+        for ($i = 1; $i <= $nombreCaissons; $i++) {
+            $chambre->caissons()->create([
+                'code' => "A{$i}",
+                'position' => $i,
+                'actif' => true,
+            ]);
+        }
+
+        return $chambre->load('caissons');
+    }
+
     public function test_creation_genere_automatiquement_les_caissons(): void
     {
         $this->connecter('ADMIN');
@@ -174,6 +196,53 @@ class EmplacementTest extends ApiTestCase
 
         $this->assertSame(0, $plan['totaux']['corps']);
         $this->assertSame(0, $plan['totaux']['occupes']);
+    }
+
+    public function test_l_ordre_des_caissons_peut_etre_modifie(): void
+    {
+        $this->connecter('ADMIN');
+
+        $chambre = $this->creerChambre('Chambre Ordre', 'commune', 3);
+        $ids = $chambre->caissons->pluck('id')->all();
+
+        $this->putJson("/api/chambres-froides/{$chambre->id}/caissons/ordre", [
+            'caissons' => [$ids[2], $ids[0], $ids[1]],
+        ])->assertOk();
+
+        $this->assertSame(
+            [$ids[2], $ids[0], $ids[1]],
+            Caisson::where('chambre_froide_id', $chambre->id)
+                ->orderBy('position')
+                ->pluck('id')
+                ->all()
+        );
+
+        $plan = $this->getJson('/api/emplacements/plan')->assertOk()->json();
+        $chambrePlan = collect($plan['chambres'])->firstWhere('id', $chambre->id);
+
+        $this->assertSame(
+            [$ids[2], $ids[0], $ids[1]],
+            array_column($chambrePlan['caissons'], 'id')
+        );
+    }
+
+    public function test_l_ordre_refuse_une_liste_incomplete_ou_etrangere(): void
+    {
+        $this->connecter('ADMIN');
+
+        $chambre = $this->creerChambre('Chambre Ordre 2', 'commune', 2);
+        $autre = $this->creerChambre('Chambre Voisine', 'commune', 1);
+        $ids = $chambre->caissons->pluck('id')->all();
+
+        /* Liste incomplète */
+        $this->putJson("/api/chambres-froides/{$chambre->id}/caissons/ordre", [
+            'caissons' => [$ids[0]],
+        ])->assertStatus(422)->assertJsonValidationErrors('caissons');
+
+        /* Caisson d'une autre chambre */
+        $this->putJson("/api/chambres-froides/{$chambre->id}/caissons/ordre", [
+            'caissons' => [$ids[0], $ids[1], $autre->caissons->first()->id],
+        ])->assertStatus(422)->assertJsonValidationErrors('caissons');
     }
 
     public function test_le_plan_exige_la_permission_emplacements_view(): void

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import "./Sortie.css";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -229,6 +230,7 @@ export default function Sortie() {
 
     /* ---------- Menu actions ---------- */
     const [openMenuId, setOpenMenuId] = useState(null);
+    const [menuPosition, setMenuPosition] = useState(null);
 
     /* ---------- Tick pour rafraîchir le calcul du retard ---------- */
     const [tick, setTick] = useState(0);
@@ -283,6 +285,25 @@ export default function Sortie() {
             document.removeEventListener("keydown", gererEchap);
         };
     }, []);
+
+    /* Le menu est positionné par rapport à la fenêtre : il se ferme
+       dès que la page ou le tableau défile. */
+    useEffect(() => {
+        if (!openMenuId) return;
+
+        const fermer = () => {
+            setOpenMenuId(null);
+            setMenuPosition(null);
+        };
+
+        window.addEventListener("scroll", fermer, true);
+        window.addEventListener("resize", fermer);
+
+        return () => {
+            window.removeEventListener("scroll", fermer, true);
+            window.removeEventListener("resize", fermer);
+        };
+    }, [openMenuId]);
 
     useEffect(() => {
         const fermer = (e) => {
@@ -1508,11 +1529,56 @@ export default function Sortie() {
                                                         className="actions-menu-trigger"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setOpenMenuId(
+
+                                                            if (
                                                                 openMenuId ===
-                                                                    sortie.id
-                                                                    ? null
-                                                                    : sortie.id
+                                                                sortie.id
+                                                            ) {
+                                                                setOpenMenuId(
+                                                                    null
+                                                                );
+                                                                setMenuPosition(
+                                                                    null
+                                                                );
+                                                                return;
+                                                            }
+
+                                                            const rect =
+                                                                e.currentTarget.getBoundingClientRect();
+                                                            const hauteur = 210;
+                                                            const sousMenu =
+                                                                rect.bottom + 4;
+                                                            const top =
+                                                                sousMenu +
+                                                                    hauteur >
+                                                                window.innerHeight
+                                                                    ? Math.max(
+                                                                          8,
+                                                                          rect.top -
+                                                                              hauteur
+                                                                      )
+                                                                    : sousMenu;
+
+                                                            setMenuPosition({
+                                                                /* Le menu reste dans la fenêtre, même si
+                                                                   la ligne était partiellement visible. */
+                                                                top: Math.min(
+                                                                    top,
+                                                                    Math.max(
+                                                                        8,
+                                                                        window.innerHeight -
+                                                                            hauteur -
+                                                                            8
+                                                                    )
+                                                                ),
+                                                                right: Math.max(
+                                                                    8,
+                                                                    window.innerWidth -
+                                                                        rect.right
+                                                                ),
+                                                            });
+                                                            setOpenMenuId(
+                                                                sortie.id
                                                             );
                                                         }}
                                                         title="Actions"
@@ -1521,9 +1587,15 @@ export default function Sortie() {
                                                     </button>
 
                                                     {openMenuId ===
-                                                        sortie.id && (
+                                                        sortie.id &&
+                                                        menuPosition &&
+                                                        createPortal(
                                                         <div
-                                                            className="actions-menu-dropdown"
+                                                            className="actions-menu-dropdown actions-menu-dropdown-flottant"
+                                                            style={{
+                                                                top: menuPosition.top,
+                                                                right: menuPosition.right,
+                                                            }}
                                                             onClick={(e) =>
                                                                 e.stopPropagation()
                                                             }
@@ -1602,7 +1674,8 @@ export default function Sortie() {
                                                                     🗑 Supprimer
                                                                 </button>
                                                             )}
-                                                        </div>
+                                                        </div>,
+                                                        document.body
                                                     )}
                                                 </div>
                                             </td>

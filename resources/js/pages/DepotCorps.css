@@ -988,6 +988,26 @@
 
 }
 
+.enregistreur-cell {
+
+  min-width: 120px;
+
+  color: #51455e;
+
+  font-size: 13px;
+
+  font-weight: 600;
+
+  white-space: nowrap;
+
+}
+
+.form-group select + input {
+
+  margin-top: 8px;
+
+}
+
 
 
 .depot-status {

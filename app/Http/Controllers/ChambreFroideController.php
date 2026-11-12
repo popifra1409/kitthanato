@@ -189,6 +189,45 @@ class ChambreFroideController extends Controller
         return response()->json($caisson, 201);
     }
 
+    /**
+     * PUT /api/chambres-froides/{chambreFroide}/caissons/ordre
+     * Réordonne les caissons d'une chambre (plan d'occupation).
+     */
+    public function reordonnerCaissons(Request $request, ChambreFroide $chambreFroide)
+    {
+        $validated = $request->validate([
+            'caissons' => 'required|array|min:1',
+            'caissons.*' => 'required|integer|distinct|exists:caissons,id',
+        ]);
+
+        $attendus = $chambreFroide->caissons()
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+
+        $fournis = collect($validated['caissons'])
+            ->map(fn ($id) => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+
+        if ($attendus !== $fournis) {
+            throw ValidationException::withMessages([
+                'caissons' => 'La liste doit contenir exactement les caissons de cette chambre.',
+            ]);
+        }
+
+        DB::transaction(function () use ($validated) {
+            foreach (array_values($validated['caissons']) as $index => $id) {
+                Caisson::whereKey($id)->update(['position' => $index + 1]);
+            }
+        });
+
+        return response()->json($chambreFroide->load('caissons'));
+    }
+
     /** PUT /api/caissons/{caisson} */
     public function updateCaisson(Request $request, Caisson $caisson)
     {

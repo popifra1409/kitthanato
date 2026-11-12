@@ -90,6 +90,7 @@ Route::put('/depots/{id}/desceller', [DepotController::class, 'desceller'])->mid
         Route::put('/chambres-froides/{chambreFroide}', [ChambreFroideController::class, 'update']);
         Route::put('/chambres-froides/{chambreFroide}/actif', [ChambreFroideController::class, 'toggleActif']);
         Route::post('/chambres-froides/{chambreFroide}/caissons', [ChambreFroideController::class, 'storeCaisson']);
+        Route::put('/chambres-froides/{chambreFroide}/caissons/ordre', [ChambreFroideController::class, 'reordonnerCaissons']);
         Route::put('/caissons/{caisson}', [ChambreFroideController::class, 'updateCaisson']);
         Route::put('/caissons/{caisson}/actif', [ChambreFroideController::class, 'toggleCaissonActif']);
     });
