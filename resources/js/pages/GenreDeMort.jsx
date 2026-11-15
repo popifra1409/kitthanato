@@ -1,1003 +1,844 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { get, post, put } from "../services/http";
 import api, { asList } from "../services/api";
 import "./GenreDeMort.css";
 
-/* Date du jour */
+/* =========================================================
+   FACTEUR D'ÉCHELLE (utilisé uniquement par l'EN-TÊTE, inchangé)
+========================================================= */
+const K = 1.074;
+
+/* =========================================================
+   DATE DU JOUR
+========================================================= */
 const dateDuJour = () =>
-  new Intl.DateTimeFormat("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date());
+    new Intl.DateTimeFormat("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+    }).format(new Date());
 
-/* Format de date provenant de Laravel */
+/* =========================================================
+   FORMAT DATE LARAVEL
+========================================================= */
 const formaterDate = (date) => {
-  if (!date) return "";
-
-  const valeur = String(date).split("T")[0].split(" ")[0];
-  const correspondance = valeur.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-
-  if (correspondance) {
-    return `${correspondance[3]}/${correspondance[2]}/${correspondance[1]}`;
-  }
-
-  return valeur;
+    if (!date) return "";
+    const valeur = String(date).split("T")[0].split(" ")[0];
+    const correspondance = valeur.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (correspondance) {
+        return `${correspondance[3]}/${correspondance[2]}/${correspondance[1]}`;
+    }
+    return valeur;
 };
 
-/* Libellé bilingue */
-function Label({ fr, en }) {
-  return (
-    <span className="label">
-      <b className="label__fr">{fr}</b>
-      <i className="label__en">{en}</i>
-    </span>
-  );
-}
+const heureHm = (v) => (v ? String(v).substring(0, 5) : "");
 
-/* Champ de saisie */
-function LineField({
-  fr,
-  en,
-  name,
-  value,
-  onChange,
-  className = "",
-}) {
-  return (
-    <div className={`field ${className}`}>
-      <Label fr={fr} en={en} />
-      <input
-        className="dots"
-        type="text"
-        name={name}
-        value={value ?? ""}
-        onChange={onChange}
-        aria-label={`${fr} ${en}`}
-      />
-    </div>
-  );
-}
-
-/* Case à cocher ou bouton radio */
-function Box({
-  label,
-  type = "checkbox",
-  name,
-  checked,
-  onChange,
-  className = "",
-}) {
-  return (
-    <label className={`box ${className}`}>
-      <span className="box__text">{label}</span>
-      <input
-        type={type}
-        name={name}
-        checked={!!checked}
-        onChange={onChange}
-      />
-      <span className="box__square" aria-hidden="true" />
-    </label>
-  );
-}
-
+/* =========================================================
+   CONSTANTES
+   x = position gauche du libellé (mm), y = centre de la ligne (mm)
+   La case se place automatiquement juste APRÈS le libellé.
+========================================================= */
 const GENRES_GAUCHE = [
-  { key: "naturelle", label: "Mort naturelle (maladie)" },
-  { key: "accident", label: "Accident" },
-  { key: "armeFeu", label: "Arme à feu" },
-  { key: "empoisonnement", label: "Empoisonnement" },
-  { key: "indeterminee", label: "Mort de cause indéterminée" },
+    { key: "naturelle", label: "Mort naturelle (maladie)", x: 68.5, y: 161.3 },
+    { key: "accident", label: "Accident", x: 68.5, y: 168 },
+    { key: "armeFeu", label: "Arme à feu", x: 68.5, y: 176.6 },
+    { key: "empoisonnement", label: "Empoisonnement", x: 68.5, y: 185.4 },
+    { key: "indeterminee", label: "Mort de cause indéterminée", x: 68.5, y: 192 },
 ];
 
 const GENRES_DROITE = [
-  { key: "violente", label: "Mort violente (cause externe)" },
-  { key: "armeBlanche", label: "Arme blanche" },
-  { key: "noyade", label: "Noyade" },
+    { key: "violente", label: "Mort violente (cause externe)", x: 129, y: 160.5 },
+    { key: "armeBlanche", label: "Arme blanche", x: 129, y: 168.4 },
+    { key: "noyade", label: "Noyade", x: 129, y: 176.6 },
 ];
 
 const OUI_NON = [
-  { key: "oui", label: "OUI" },
-  { key: "non", label: "NON" },
-  { key: "inconnu", label: "Inconnu" },
+    { key: "oui", label: "OUI" },
+    { key: "non", label: "NON" },
+    { key: "inconnu", label: "Inconnu" },
 ];
 
 const DONNEES_VIDES = {
-  ref: "",
-  yaounde: "",
-  soussigne: "",
-  constat: "",
-  leOn: "",
-  atteste: "",
-  sexe: "",
-  nele: "",
-  decedeLe: "",
-  a: "",
-  lieu: "",
-  heures: "",
-  minutes: "",
-  autres: "",
-  autresPrecision: "",
-  contagion: "",
-  autopsie: "",
-  faitA: "",
-  faitLe: "",
-  faitHeure: "",
+    ref: "",
+    yaounde: "",
+    soussigne: "",
+    constat: "",
+    leOn: "",
+    atteste: "",
+    sexe: "",
+    nele: "",
+    decedeLe: "",
+    a: "",
+    lieu: "",
+    heures: "",
+    minutes: "",
+    autres: "",
+    autresPrecision: "",
+    contagion: "",
+    autopsie: "",
+    faitA: "",
+    faitLe: "",
+    faitHeure: "",
 };
 
+const statutDepot = (depot) => {
+    if (!depot) return { label: "—", classe: "depot-statut--neutre" };
+    if (depot.scelle)
+        return { label: "Scellé", classe: "depot-statut--scelle" };
+
+    const statut = String(depot.statut || "").toUpperCase();
+    if (statut === "SORTI")
+        return { label: "Sorti", classe: "depot-statut--sorti" };
+    if (statut === "TRANSFÉRÉ" || statut === "TRANSFERE")
+        return { label: "Transféré", classe: "depot-statut--transfere" };
+    if (statut === "PRÉSENT" || statut === "PRESENT")
+        return { label: "Présent", classe: "depot-statut--present" };
+    return { label: depot.statut || "—", classe: "depot-statut--neutre" };
+};
+
+/* =========================================================
+   EN-TÊTES IMPRIMÉS (inchangés)
+========================================================= */
+const LEFT_HEAD = [
+    ["REPUBLIQUE DU CAMEROUN", 3.6, 0],
+    ["Paix-Travail-Patrie", 6.8, 0],
+    ["-----------", 9.6, 0],
+    ["MINISTERE DE LA SANTE PUBLIQUE", 12.3, 0],
+    ["-----------", 15.9, 0],
+    ["HOPITAL GENERAL DE YAOUNDE", 19.5, 0],
+    ["-----------", 23.3, 0],
+    ["B.P. 5408", 27, 0],
+    ["Tél : (237) 222.21.31.81", 30.7, 0],
+    ["Fax : (237) 222.21.30.15", 34.3, 0],
+    ["hopitalgeneraldeyaounde@gmail.com", 37.9, 0],
+];
+
+const RIGHT_HEAD = [
+    ["REPUBLIC OF CAMEROON", 3.6, 0],
+    ["Peace-Work-Fatherland", 6.8, 0],
+    ["-----------", 9.6, 0],
+    ["MINISTRY OF PUBLIC HEALTH", 12.3, 0],
+    ["-----------", 15.9, 0],
+    ["YAOUNDE GENERAL HOSPITAL", 19.5, 0],
+    ["-----------", 23.3, 0],
+];
+
+/* =========================================================
+   COMPOSANT
+========================================================= */
 function GenreDeMort() {
-  const { depotId } = useParams();
-  const navigate = useNavigate();
+    const { depotId } = useParams();
+    const navigate = useNavigate();
 
-  /* Défunts */
-  const [depots, setDepots] = useState([]);
-  const [chargementDepots, setChargementDepots] = useState(true);
-  const [depotSelectionne, setDepotSelectionne] = useState("");
-  const [rechercheDefunt, setRechercheDefunt] = useState("");
-  const [listeOuverte, setListeOuverte] = useState(false);
+    const [depots, setDepots] = useState([]);
+    const [chargementDepots, setChargementDepots] = useState(false);
 
-  /* Certificat */
-  const [chargement, setChargement] = useState(false);
-  const [erreur, setErreur] = useState("");
-  const [message, setMessage] = useState("");
-  const [certificatId, setCertificatId] = useState(null);
-  const [nomsCertificat, setNomsCertificat] = useState([]);
-  const [enregistrement, setEnregistrement] = useState(false);
+    const [selecteurOuvert, setSelecteurOuvert] = useState(false);
+    const [recherche, setRecherche] = useState("");
+    const [chargementSelection, setChargementSelection] = useState(false);
 
-  const [data, setData] = useState({
-    ...DONNEES_VIDES,
-    yaounde: dateDuJour(),
-  });
+    const [chargement, setChargement] = useState(false);
+    const [message, setMessage] = useState({
+        open: false,
+        type: "success",
+        text: "",
+    });
+    const [certificatId, setCertificatId] = useState(null);
+    const [enregistrement, setEnregistrement] = useState(false);
 
-  const [genres, setGenres] = useState({});
+    const [data, setData] = useState({
+        ...DONNEES_VIDES,
+        yaounde: dateDuJour(),
+    });
+    const [genres, setGenres] = useState({});
+    const [defuntActif, setDefuntActif] = useState(null);
 
-  /* Libellé affiché pour chaque défunt */
-  const libelleDepot = (depot) =>
-    [
-      depot.code || depot.code_defunt,
-      depot.nom,
-      depot.prenom,
-    ]
-      .filter(Boolean)
-      .join(" - ");
+    /* Auto-dismiss */
+    useEffect(() => {
+        if (!message.open) return;
+        const timer = setTimeout(() => {
+            setMessage((m) => ({ ...m, open: false }));
+        }, 2500);
+        return () => clearTimeout(timer);
+    }, [message.open, message.text]);
 
-  /* Recherche directement dans le champ de sélection */
-  const depotsFiltres = depots.filter((depot) => {
-    const recherche = rechercheDefunt.trim().toLowerCase();
+    const afficherMessage = (type, text) => {
+        setMessage({ open: true, type, text });
+    };
 
-    const informations = [
-      depot.code,
-      depot.code_defunt,
-      depot.nom,
-      depot.prenom,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
+    const set = (k, v) => setData((s) => ({ ...s, [k]: v }));
 
-    return informations.includes(recherche);
-  });
-
-  /* Modifier un champ du certificat */
-  const set = (e) => {
-    const { name, value } = e.target;
-    if (!name) return;
-
-    setData((ancienneData) => ({
-      ...ancienneData,
-      [name]: value,
-    }));
-  };
-
-  /* Charger les défunts */
-  useEffect(() => {
-    let actif = true;
-
+    /* =====================================================
+       CHARGEMENT DES DÉPÔTS
+    ===================================================== */
     const chargerDepots = async () => {
-      try {
-        setChargementDepots(true);
-
-        const resultat = await api.depots.list();
-
-        if (actif) {
-  setDepots(
-    asList(resultat, "depots").filter(
-      (depot) =>
-        String(depot.statut || "").toUpperCase() === "PRÉSENT" &&
-        !depot.scelle
-    )
-  );
-}
-      } catch (error) {
-        console.error("Erreur de chargement des dépôts :", error);
-
-        if (actif) setDepots([]);
-      } finally {
-        if (actif) setChargementDepots(false);
-      }
-    };
-
-    chargerDepots();
-
-    return () => {
-      actif = false;
-    };
-  }, []);
-
-  /* Sélectionner un défunt dans les suggestions */
-  const choisirDefunt = (depot) => {
-    setDepotSelectionne(String(depot.id));
-    setRechercheDefunt(libelleDepot(depot));
-    setListeOuverte(false);
-    setErreur("");
-  };
-
-  /* Cocher ou décocher un genre de mort */
-  const toggleGenre = (key) => {
-    setGenres((anciensGenres) => ({
-      ...anciensGenres,
-      [key]: !anciensGenres[key],
-    }));
-  };
-
-useEffect(() => {
-  const fermer = (e) => {
-    if (e.type === "keydown") {
-      if (e.key === "Escape") setListeOuverte(false);
-      return;
-    }
-    if (!e.target.closest(".gm-autocomplete")) {
-      setListeOuverte(false);
-    }
-  };
-
-  document.addEventListener("mousedown", fermer);
-  document.addEventListener("keydown", fermer);
-
-  return () => {
-    document.removeEventListener("mousedown", fermer);
-    document.removeEventListener("keydown", fermer);
-  };
-}, []);
-
-  /* Charger le certificat du défunt */
-  useEffect(() => {
-    let actif = true;
-
-    const chargerDonnees = async () => {
-      if (!depotId) {
-        setChargement(false);
-        setErreur("");
-        setMessage("");
-        setCertificatId(null);
-        setNomsCertificat([]);
-        setData({
-          ...DONNEES_VIDES,
-          yaounde: dateDuJour(),
-        });
-        setGenres({});
-        return;
-      }
-
-      try {
-        setChargement(true);
-        setErreur("");
-        setMessage("");
-
-        const [resultat, noms] = await Promise.all([
-          get(`/certificats-genre-mort/depot/${depotId}`),
-          get("/certificats-genre-mort/noms"),
-        ]);
-
-        if (!actif) return;
-
-        setNomsCertificat(Array.isArray(noms) ? noms : []);
-
-        const depot = resultat?.depot || {};
-        const certificat = resultat?.certificat || null;
-
-        const donneesDefunt = {
-          sexe:
-            depot.sexe === "Masculin"
-              ? "M"
-              : depot.sexe === "Féminin"
-                ? "F"
-                : depot.sexe === "M" || depot.sexe === "F"
-                  ? depot.sexe
-                  : "",
-
-          nele: formaterDate(depot.date_naissance),
-          decedeLe: formaterDate(depot.date_deces),
-
-          heures: depot.heure_deces
-            ? String(depot.heure_deces).split(":")[0]
-            : "",
-
-          minutes: depot.heure_deces
-            ? String(depot.heure_deces).split(":")[1] || ""
-            : "",
-
-          atteste: [depot.nom, depot.prenom]
-            .filter(Boolean)
-            .join(" "),
-        };
-
-        if (certificat) {
-          setCertificatId(certificat.id);
-
-          setData({
-            ...DONNEES_VIDES,
-            ...donneesDefunt,
-            ...(certificat.donnees || {}),
-            yaounde: dateDuJour(),
-          });
-
-          setGenres(certificat.genres || {});
-        } else {
-          setCertificatId(null);
-
-          setData({
-            ...DONNEES_VIDES,
-            ...donneesDefunt,
-            yaounde: dateDuJour(),
-          });
-
-          setGenres({});
+        try {
+            setChargementDepots(true);
+            const resultat = await api.depots.list();
+            setDepots(asList(resultat, "depots"));
+        } catch (error) {
+            console.error(error);
+            setDepots([]);
+            afficherMessage(
+                "error",
+                "Impossible de charger la liste des défunts."
+            );
+        } finally {
+            setChargementDepots(false);
         }
-      } catch (error) {
-        if (!actif) return;
-
-        console.error("Erreur de chargement du certificat :", error);
-
-        setErreur(
-          error.message || "Impossible de charger le certificat."
-        );
-      } finally {
-        if (actif) setChargement(false);
-      }
     };
 
-    chargerDonnees();
+    useEffect(() => {
+        chargerDepots();
+    }, []);
 
-    return () => {
-      actif = false;
+    /* =====================================================
+       FILTRE
+    ===================================================== */
+    const depotsFiltres = useMemo(() => {
+        const t = recherche.trim().toLowerCase();
+
+        const base = !t
+            ? depots
+            : depots.filter((depot) => {
+                  const texte = [
+                      depot.code,
+                      depot.code_defunt,
+                      depot.nom,
+                      depot.prenom,
+                      depot.contact_nom,
+                  ]
+                      .filter(Boolean)
+                      .join(" ")
+                      .toLowerCase();
+                  return texte.includes(t);
+              });
+
+        return [...base].sort((a, b) =>
+            `${a.nom || ""} ${a.prenom || ""}`.localeCompare(
+                `${b.nom || ""} ${b.prenom || ""}`,
+                "fr"
+            )
+        );
+    }, [depots, recherche]);
+
+    /* =====================================================
+       LIBELLÉ
+    ===================================================== */
+    const libelleDepot = (depot) =>
+        [depot.code || depot.code_defunt, depot.nom, depot.prenom]
+            .filter(Boolean)
+            .join(" - ");
+
+    /* =====================================================
+       CHARGEMENT DU CERTIFICAT
+    ===================================================== */
+    const chargerCertificat = async (idDepot, libelleDefunt) => {
+        if (!idDepot) return;
+
+        try {
+            setChargement(true);
+
+            const resultat = await get(
+                `/certificats-genre-mort/depot/${idDepot}`
+            );
+
+            const depot = resultat?.depot || {};
+            const certificat = resultat?.certificat || null;
+
+            const donneesDefunt = {
+                sexe:
+                    depot.sexe === "Masculin"
+                        ? "M"
+                        : depot.sexe === "Féminin"
+                        ? "F"
+                        : depot.sexe === "M" || depot.sexe === "F"
+                        ? depot.sexe
+                        : "",
+                nele: formaterDate(depot.date_naissance),
+                decedeLe: formaterDate(depot.date_deces),
+                heures: depot.heure_deces
+                    ? String(depot.heure_deces).split(":")[0]
+                    : "",
+                minutes: depot.heure_deces
+                    ? String(depot.heure_deces).split(":")[1] || ""
+                    : "",
+                atteste: [depot.nom, depot.prenom]
+                    .filter(Boolean)
+                    .join(" "),
+            };
+
+            if (certificat) {
+                setCertificatId(certificat.id);
+                setData({
+                    ...DONNEES_VIDES,
+                    ...donneesDefunt,
+                    ...(certificat.donnees || {}),
+                    yaounde: dateDuJour(),
+                });
+                setGenres(certificat.genres || {});
+            } else {
+                setCertificatId(null);
+                setData({
+                    ...DONNEES_VIDES,
+                    ...donneesDefunt,
+                    yaounde: dateDuJour(),
+                });
+                setGenres({});
+            }
+
+            setDefuntActif({
+                id: String(idDepot),
+                libelle: libelleDefunt || depot.code || `Dépôt #${idDepot}`,
+            });
+        } catch (error) {
+            console.error(error);
+            afficherMessage(
+                "error",
+                error.message || "Impossible de charger le certificat."
+            );
+        } finally {
+            setChargement(false);
+        }
     };
-  }, [depotId]);
 
-  /* Ouvrir le certificat sélectionné */
-  const ouvrirCertificat = (e) => {
-    e.preventDefault();
+    /* =====================================================
+       SÉLECTION
+    ===================================================== */
+    const choisirDefunt = async (depot) => {
+        setChargementSelection(true);
+        try {
+            setSelecteurOuvert(false);
+            setRecherche("");
 
-    if (!depotSelectionne) {
-      setErreur("Veuillez choisir un défunt dans la liste.");
-      setListeOuverte(true);
-      return;
-    }
+            if (String(depot.id) !== String(depotId || "")) {
+                navigate(`/certificatgenremort/${depot.id}`, {
+                    replace: false,
+                });
+            }
 
-    setErreur("");
-    navigate(`/certificatgenremort/${depotSelectionne}`);
-  };
+            await chargerCertificat(depot.id, libelleDepot(depot));
+        } finally {
+            setChargementSelection(false);
+        }
+    };
 
-  /* Enregistrer ou modifier le certificat */
-  const enregistrerCertificat = async (e) => {
-    e.preventDefault();
+    /* =====================================================
+       CHARGEMENT INITIAL
+    ===================================================== */
+    useEffect(() => {
+        if (!depotId) {
+            setData({ ...DONNEES_VIDES, yaounde: dateDuJour() });
+            setGenres({});
+            setCertificatId(null);
+            setDefuntActif(null);
+            return;
+        }
 
-    if (!depotId) {
-      setErreur("Veuillez d'abord sélectionner un défunt.");
-      return;
-    }
+        chargerCertificat(depotId);
 
-    try {
-      setEnregistrement(true);
-      setErreur("");
-      setMessage("");
+        const depot = depots.find((d) => String(d.id) === String(depotId));
+        if (depot) {
+            setDefuntActif({
+                id: String(depot.id),
+                libelle: libelleDepot(depot),
+            });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [depotId, depots]);
 
-      const payload = {
-        depot_id: Number(depotId),
-        donnees: {
-          ...data,
-          yaounde: dateDuJour(),
-        },
-        genres,
-      };
+    /* =====================================================
+       GENRES
+    ===================================================== */
+    const toggleGenre = (key) => {
+        setGenres((anciensGenres) => ({
+            ...anciensGenres,
+            [key]: !anciensGenres[key],
+        }));
+    };
 
-      if (certificatId) {
-        await put(
-          `/certificats-genre-mort/${certificatId}`,
-          payload
-        );
+    /* =====================================================
+       ENREGISTRER
+    ===================================================== */
+    const enregistrerCertificat = async (e) => {
+        if (e) e.preventDefault();
 
-        setMessage("Certificat modifié avec succès.");
-      } else {
-        const resultat = await post(
-          "/certificats-genre-mort",
-          payload
-        );
+        if (!defuntActif?.id) {
+            afficherMessage("error", "Veuillez sélectionner un défunt.");
+            return;
+        }
 
-        const nouvelId =
-          resultat?.certificat?.id ??
-          resultat?.data?.certificat?.id ??
-          resultat?.data?.id ??
-          resultat?.id;
+        try {
+            setEnregistrement(true);
 
-        if (nouvelId) setCertificatId(nouvelId);
+            const payload = {
+                depot_id: Number(defuntActif.id),
+                donnees: { ...data, yaounde: dateDuJour() },
+                genres,
+            };
 
-        setMessage("Certificat enregistré avec succès.");
-      }
-    } catch (error) {
-      console.error("Erreur d'enregistrement :", error);
+            if (certificatId) {
+                await put(
+                    `/certificats-genre-mort/${certificatId}`,
+                    payload
+                );
+                afficherMessage(
+                    "success",
+                    "Certificat modifié avec succès."
+                );
+            } else {
+                const resultat = await post(
+                    "/certificats-genre-mort",
+                    payload
+                );
+                const nouvelId =
+                    resultat?.certificat?.id ??
+                    resultat?.data?.certificat?.id ??
+                    resultat?.data?.id ??
+                    resultat?.id;
 
-      setErreur(
-        error.message || "Impossible d'enregistrer le certificat."
-      );
-    } finally {
-      setEnregistrement(false);
-    }
-  };
+                if (nouvelId) setCertificatId(nouvelId);
 
-  /* Fenêtre modale de sélection */
-  if (!depotId) {
-    return (
-      <div className="gm-modal-overlay">
-        <div
-          className="gm-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="gm-modal-title"
+                afficherMessage(
+                    "success",
+                    "Certificat enregistré avec succès."
+                );
+            }
+        } catch (error) {
+            console.error(error);
+            afficherMessage(
+                "error",
+                error.message || "Impossible d'enregistrer le certificat."
+            );
+        } finally {
+            setEnregistrement(false);
+        }
+    };
+
+    /* =====================================================
+       RETOUR / IMPRIMER
+    ===================================================== */
+    const retour = () => {
+        if (window.history.length > 1) navigate(-1);
+        else navigate("/");
+    };
+
+    const imprimer = () => {
+        window.requestAnimationFrame(() => {
+            window.print();
+        });
+    };
+
+    /* =====================================================
+       COMPOSANTS D'IMPRESSION
+       Toutes les coordonnées du corps sont en mm :
+       x = bord gauche, y = CENTRE vertical de la ligne.
+    ===================================================== */
+
+    // Texte imprimé
+    const T = (text, x, y, cls = "") => (
+        <span
+            className={`t ${cls}`}
+            style={{ left: `${x}mm`, top: `${y - 3}mm` }}
         >
-          <div className="gm-modal__header">
-            <div className="gm-modal__icon" aria-hidden="true">
-              📄
-            </div>
+            {text}
+        </span>
+    );
 
-            <div>
-              <h2 id="gm-modal-title">
-                Sélectionner le défunt
-              </h2>
-              <p>
-                Recherchez un défunt par son code, son nom ou
-                son prénom.
-              </p>
-            </div>
-          </div>
+    // Champ de saisie (ligne pointillée)
+    const I = (k, x, w, y, cls = "") => (
+        <input
+            className={`f-input ${cls}`}
+            style={{
+                left: `${x}mm`,
+                width: `${w}mm`,
+                top: `${y - 2.7}mm`,
+            }}
+            value={data[k] ?? ""}
+            onChange={(e) => set(k, e.target.value)}
+            aria-label={k}
+        />
+    );
 
-          {erreur && (
-            <p role="alert" className="gm-message gm-message--error">
-              {erreur}
-            </p>
-          )}
-
-          <form
-            onSubmit={ouvrirCertificat}
-            className="gm-modal__form"
-          >
-            <label
-              className="gm-modal__label"
-              htmlFor="gm-depot-selection"
+    // Libellé + case à cocher JUSTE APRÈS le libellé (comme sur le papier)
+    const LB = (label, checked, onClick, x, y, cls = "") => (
+        <span
+            className={`lb ${cls}`}
+            style={{ left: `${x}mm`, top: `${y - 3}mm` }}
+        >
+            <span>{label}</span>
+            <button
+                type="button"
+                className="f-box"
+                role="checkbox"
+                aria-checked={checked}
+                onClick={onClick}
             >
-              Défunt <span>*</span>
-            </label>
+                {checked ? "✕" : ""}
+            </button>
+        </span>
+    );
 
-            {/* Un seul champ de recherche et de sélection */}
-            <div className="gm-autocomplete">
-              <input
-                id="gm-depot-selection"
-                className="gm-modal__select"
-                type="text"
-                value={rechercheDefunt}
-                placeholder={
-                  chargementDepots
-                    ? "Chargement des défunts..."
-                    : "Choisir un défunt..."
-                }
-                autoComplete="off"
-                disabled={chargementDepots}
-                role="combobox"
-                aria-autocomplete="list"
-                aria-expanded={listeOuverte}
-                aria-controls="gm-liste-defunts"
-                onFocus={() => setListeOuverte(true)}
-                onChange={(e) => {
-                  setRechercheDefunt(e.target.value);
-                  setDepotSelectionne("");
-                  setErreur("");
-                  setListeOuverte(true);
-                }}
-              />
+    // Choix unique (Masculin/Féminin, OUI/NON/Inconnu)
+    const B = (k, v, label, x, y, cls = "") =>
+        LB(
+            label,
+            data[k] === v,
+            () => set(k, data[k] === v ? "" : v),
+            x,
+            y,
+            cls
+        );
 
-              <span className="gm-autocomplete__arrow" aria-hidden="true">
-                ▾
-              </span>
+    // Genre de mort (cases multiples)
+    const G = (g) =>
+        LB(g.label, !!genres[g.key], () => toggleGenre(g.key), g.x, g.y, "sm");
 
-              {listeOuverte && !chargementDepots && (
-                <div
-                  id="gm-liste-defunts"
-                  className="gm-autocomplete__liste"
-                  role="listbox"
+    const head = (lines, left) => (
+        <div className="head-col" style={{ left: `${left}mm` }}>
+            {lines.map(([txt, y, bold], i) => (
+                <p
+                    key={i}
+                    className={bold ? "b" : ""}
+                    style={{ top: `${y * K - 1.8}mm` }}
                 >
-                  {depotsFiltres.length > 0 ? (
-                    depotsFiltres.map((depot) => (
-                      <button
-                        key={depot.id}
-                        type="button"
-                        className={
-                          depotSelectionne === String(depot.id)
-                            ? "gm-autocomplete__option gm-autocomplete__option--active"
-                            : "gm-autocomplete__option"
-                        }
-                        role="option"
-                        aria-selected={
-                          depotSelectionne === String(depot.id)
-                        }
-                        onClick={() => choisirDefunt(depot)}
-                      >
-                        <span className="gm-autocomplete__nom">
-                          {[depot.nom, depot.prenom]
-                            .filter(Boolean)
-                            .join(" ")}
-                        </span>
+                    {txt}
+                </p>
+            ))}
+        </div>
+    );
 
-                        <span className="gm-autocomplete__code">
-                          {depot.code || depot.code_defunt || "Sans code"}
-                        </span>
-                      </button>
-                    ))
-                  ) : (
-                    <p className="gm-autocomplete__vide">
-                      {depots.length === 0
-                        ? "Aucun dépôt disponible."
-                        : "Aucun défunt trouvé pour cette recherche."}
-                    </p>
-                  )}
+    /* =====================================================
+       RENDU
+    ===================================================== */
+    return (
+        <div className="sheet-wrap">
+            {/* MESSAGE */}
+            {message.open && (
+                <div
+                    className={`depot-message message-${message.type} no-print`}
+                    role="alert"
+                >
+                    <span className="message-icon">
+                        {message.type === "success" ? "✓" : "!"}
+                    </span>
+                    <span>{message.text}</span>
                 </div>
-              )}
-            </div>
-
-            {depotSelectionne && (
-              <p className="gm-modal__info">
-                Défunt sélectionné : {rechercheDefunt}
-              </p>
             )}
 
-            <div className="gm-modal__actions">
-              <button
-                type="button"
-                className="gm-modal__btn gm-modal__btn--secondary"
-                onClick={() => navigate(-1)}
-              >
-                Annuler
-              </button>
+            {/* BARRE DE RECHERCHE */}
+            <div className="top-search no-print">
+                <button
+                    type="button"
+                    className="top-search-trigger"
+                    onClick={() => {
+                        setRecherche("");
+                        setSelecteurOuvert(true);
+                    }}
+                >
+                    🔍 Choisir le défunt
+                </button>
 
-              <button
-                type="submit"
-                className="gm-modal__btn gm-modal__btn--primary"
-                disabled={chargementDepots || !depotSelectionne}
-              >
-                Ouvrir le certificat →
-              </button>
+                {defuntActif && (
+                    <div className="top-search-current">
+                        <span>Sélectionné :</span>
+                        <strong>{defuntActif.libelle}</strong>
+                    </div>
+                )}
             </div>
-          </form>
+
+            {/* CHARGEMENT */}
+            {chargement && (
+                <p className="gm-loading no-print">
+                    Chargement du certificat…
+                </p>
+            )}
+
+            {/* FEUILLE A4 */}
+            <main className="sheet">
+                {/* ---------- EN-TÊTE (inchangé) ---------- */}
+                {head(LEFT_HEAD, 11)}
+                <img
+                    className="gm-header__emblem"
+                    src="/logo.png"
+                    alt="Logo de l'hôpital"
+                />
+                {head(RIGHT_HEAD, 153)}
+
+                {/* ---------- N/Ref (inchangé) ---------- */}
+                {T("N/Ref :", 25.6, 52.6)}
+                {I("ref", 40, 32, 52.6)}
+                {T("/HGY/DMR/CD", 73, 52.6)}
+
+                {/* ---------- Yaoundé le (à droite) ---------- */}
+                {T("Yaoundé le", 139.3, 55)}
+                {I("yaounde", 160.5, 26, 55)}
+                {T("Yaounde the", 139.5, 59.4, "en")}
+
+                {/* ---------- Titre ---------- */}
+                <h1 className="title" style={{ top: `${70.7 - 3.5}mm` }}>
+                    CERTIFICAT DE GENRE DE MORT
+                </h1>
+
+                {/* ---------- Je soussigné ---------- */}
+                {T("Je soussigné", 25.6, 84.9)}
+                {I("soussigne", 57, 134, 84.9)}
+                {T("I, the Undersigned", 27, 89.3, "en")}
+
+                {/* ---------- Sur la base du constat (champ à droite du libellé) ---------- */}
+                {T("Sur la base du Constat de décès établi par", 25.6, 98.7)}
+                {I("constat", 109.5, 83, 98.7)}
+                {T("Based on the death confirmed by", 32, 103.1, "en")}
+
+                {/* ---------- Le/on (à droite) ---------- */}
+                {T("Le/on", 91.5, 107.2)}
+                {I("leOn", 102, 90, 107.2)}
+
+                {/* ---------- Atteste que ---------- */}
+                {T("Atteste que :", 25.6, 111.8)}
+                {I("atteste", 49, 144, 112.3)}
+                {T("Affirms that", 25.6, 116, "en")}
+
+                {/* ---------- Sexe : Masculin □ ........ Féminin □ ---------- */}
+                {T("Sexe/Sex :", 25.6, 125.5, "bold")}
+                {B("sexe", "M", "Masculin", 52.9, 125.5)}
+                {B("sexe", "F", "Féminin", 115.6, 125.5)}
+
+                {/* ---------- Né(e) le ... est décédé le ... A ... ---------- */}
+                {T("Né(e) le :", 25.6, 133)}
+                {I("nele", 45, 27, 132)}
+                {T("Born on", 25.6, 138.6, "en")}
+
+                {T("est décédé le", 74.5, 133)}
+                {I("decedeLe", 100.5, 30, 133)}
+                {T("died on", 85, 138.6, "en")}
+
+                {T("A", 132, 134.2)}
+                {I("heures", 136, 10, 133)}
+                {T("heure(s)", 146.8, 133)}
+                {I("minutes", 164, 10, 133)}
+                {T("minute(s)", 173, 133)}
+                
+
+                {/* ---------- Lieu du décès + heure(s) / minute(s) ---------- */}
+                {T("Lieu du décès :", 25.6, 145.4)}
+                {I("lieu", 54, 140, 145.4)}
+                {T("Place of death", 25.6, 149.6, "en")}
+
+                {/* ---------- Genre de mort ---------- */}
+                {T("Genre de mort :", 25.6, 158.2)}
+                {T("Cause of death", 25.6, 162.2, "en")}
+
+                {/* Colonne gauche : libellé puis case */}
+                {GENRES_GAUCHE.map((g) => (
+                    <React.Fragment key={g.key}>{G(g)}</React.Fragment>
+                ))}
+
+                {/* Colonne droite : libellé puis case */}
+                {GENRES_DROITE.map((g) => (
+                    <React.Fragment key={g.key}>{G(g)}</React.Fragment>
+                ))}
+
+                {/* Autres : ______ puis ______ (à préciser) */}
+                {T("Autres :", 129, 185.2, "sm")}
+                {I("autres", 141.5, 38, 185.2)}
+                {I("autresPrecision", 130, 39, 192.3)}
+                {T("(à préciser)", 170.5, 191, "sm")}
+
+                {/* ---------- Contagiosité ---------- */}
+                {T(
+                    "La dépouille présente-t-elle un risque de contagiosité particulier ?",
+                    25.6,
+                    200.8,
+                    "q"
+                )}
+                {T(
+                    "Is the corpse presenting any risk of contamination ?",
+                    25.6,
+                    206.8,
+                    "en"
+                )}
+                {B("contagion", "oui", "OUI", 24.5, 216, "lg")}
+                {B("contagion", "non", "NON", 80.9, 216, "lg")}
+                {B("contagion", "inconnu", "Inconnu", 129.5, 216, "sm")}
+
+                {/* ---------- Autopsie ---------- */}
+                {T("Une autopsie a-t-elle été réalisée ?", 25.6, 226.6, "q")}
+                {T("Was an autopsy performed ?", 25.6, 232.5, "en")}
+                {B("autopsie", "oui", "OUI", 24.5, 242, "lg")}
+                {B("autopsie", "non", "NON", 80.9, 242, "lg")}
+                {B("autopsie", "inconnu", "Inconnu", 129.5, 242, "sm")}
+
+                {/* ---------- Fait à ... Le ... Heure ... ---------- */}
+                {T("Fait à", 67.3, 254.5, "bold")}
+                {I("faitA", 80.5, 33, 254)}
+                {T("Le", 115.5, 254.5, "bold")}
+                {I("faitLe", 122.5, 25, 254)}
+                {T("Heure", 149.3, 254.5, "bold")}
+                {I("faitHeure", 162.5, 24, 254)}
+
+                {/* ---------- Signature ---------- */}
+                <strong className="sign" style={{ top: `${261 - 3}mm` }}>
+                    Signature et Cachet du Praticien
+                </strong>
+            </main>
+
+            {/* BOUTONS */}
+            <div className="bottom-actions no-print">
+                <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={enregistrerCertificat}
+                    disabled={enregistrement || !defuntActif}
+                >
+                    💾{" "}
+                    {enregistrement
+                        ? "Enregistrement…"
+                        : certificatId
+                        ? "Enregistrer les modifications"
+                        : "Enregistrer"}
+                </button>
+
+                <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={imprimer}
+                    disabled={!defuntActif}
+                >
+                    🖨 Imprimer / PDF
+                </button>
+
+                <button
+                    type="button"
+                    className="btn-retour"
+                    onClick={retour}
+                >
+                    ← Retour
+                </button>
+            </div>
+
+            {/* SÉLECTEUR */}
+            {selecteurOuvert && (
+                <div
+                    className="selecteur-overlay no-print"
+                    onMouseDown={(e) => {
+                        if (e.target === e.currentTarget)
+                            setSelecteurOuvert(false);
+                    }}
+                >
+                    <div className="selecteur-modal">
+                        <div className="selecteur-header">
+                            <div>
+                                <h2>Choisir le défunt</h2>
+                                <p>
+                                    Tous les défunts enregistrés. Cliquez
+                                    sur un nom pour ouvrir son certificat.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                className="selecteur-close"
+                                onClick={() => setSelecteurOuvert(false)}
+                                aria-label="Fermer"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="selecteur-recherche">
+                            <input
+                                type="text"
+                                placeholder="Rechercher par nom, prénom ou code défunt..."
+                                value={recherche}
+                                onChange={(e) => setRecherche(e.target.value)}
+                                autoFocus
+                            />
+                            {recherche && (
+                                <button
+                                    type="button"
+                                    onClick={() => setRecherche("")}
+                                    aria-label="Effacer"
+                                >
+                                    ×
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="selecteur-liste">
+                            {chargementDepots ? (
+                                <p className="selecteur-vide">
+                                    Chargement des défunts…
+                                </p>
+                            ) : depotsFiltres.length === 0 ? (
+                                <p className="selecteur-vide">
+                                    Aucun défunt ne correspond.
+                                </p>
+                            ) : (
+                                depotsFiltres.map((depot) => {
+                                    const statut = statutDepot(depot);
+                                    return (
+                                        <button
+                                            key={depot.id}
+                                            type="button"
+                                            className="selecteur-item"
+                                            onClick={() => choisirDefunt(depot)}
+                                            disabled={chargementSelection}
+                                        >
+                                            <div className="selecteur-item-left">
+                                                <strong>
+                                                    {depot.nom || ""}{" "}
+                                                    {depot.prenom || ""}
+                                                </strong>
+                                                <span>
+                                                    Code défunt :{" "}
+                                                    <b>
+                                                        {depot.code_defunt ||
+                                                            "-"}
+                                                    </b>
+                                                </span>
+                                                <span>
+                                                    Décès :{" "}
+                                                    {formaterDate(
+                                                        depot.date_deces
+                                                    ) || "-"}
+                                                    {depot.heure_deces
+                                                        ? ` à ${heureHm(
+                                                              depot.heure_deces
+                                                          )}`
+                                                        : ""}
+                                                </span>
+                                            </div>
+                                            <div className="selecteur-item-right">
+                                                <span
+                                                    className={`depot-statut ${statut.classe}`}
+                                                >
+                                                    {statut.label}
+                                                </span>
+                                                <span>
+                                                    {depot.provenance || "-"}
+                                                </span>
+                                            </div>
+                                        </button>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        <div className="selecteur-actions">
+                            <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={() => setSelecteurOuvert(false)}
+                            >
+                                Fermer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
-      </div>
     );
-  }
-
-  /* Chargement */
-  if (chargement) {
-    return <p>Chargement du certificat...</p>;
-  }
-
-  return (
-    <div className="gm-page">
-      {erreur && (
-        <p role="alert" className="gm-message gm-message--error">
-          {erreur}
-        </p>
-      )}
-
-      {message && (
-        <p role="status" className="gm-message gm-message--success">
-          {message}
-        </p>
-      )}
-
-      {/* En-tête de l'hôpital */}
-      <header className="gm-header">
-        <div className="gm-header__fr">
-          <p>REPUBLIQUE DU CAMEROUN</p>
-          <p>Paix-Travail-Patrie</p>
-          <span>---------</span>
-          <p>MINISTERE DE LA SANTE PUBLIQUE</p>
-          <span>-----------</span>
-          <p>HOPITAL GENERAL DE YAOUNDE</p>
-          <span>------------------</span>
-          <span>B.P.5408</span>
-          <span>Tel :(237) 222.21.31.81</span>
-          <span>Fax :(237) 222.21.20.15</span>
-          <span className="lien">
-            hopitalgeneraldeyaounde@gmail.com
-          </span>
-        </div>
-
-        <img
-          className="gm-header__emblem"
-          src="/logo.png"
-          alt="Logo de l'hôpital"
-        />
-
-        <div className="gm-header__en">
-          <p>REPUBLIC OF CAMEROON</p>
-          <p>Peace-Work-Fatherland</p>
-          <span>---------</span>
-          <p>MINISTRY OF PUBLIC HEALTH</p>
-          <span>-----------</span>
-          <p>YAOUNDE GENERAL HOSPITAL</p>
-          <span>------------------</span>
-        </div>
-      </header>
-
-      {/* Référence */}
-      <div className="ref">
-        <strong>N/Ref :</strong>
-        <input
-          className="dots dots--solid"
-          type="text"
-          name="ref"
-          value={data.ref ?? ""}
-          onChange={set}
-        />
-        <strong>/HGY/DMR/CD</strong>
-      </div>
-
-      {/* Date automatique */}
-      <div className="gm-top">
-        <div className="gm-top__row">
-          <span>Yaoundé le</span>
-          <input
-            className="dots dots--solid"
-            type="text"
-            value={data.yaounde ?? ""}
-            readOnly
-            aria-label="Yaoundé le"
-          />
-        </div>
-        <i className="gm-top__en">Yaounde the</i>
-      </div>
-
-      <h1 className="gm-title">
-        CERTIFICAT DE GENRE DE MORT
-      </h1>
-
-      <form className="gm-form" onSubmit={enregistrerCertificat}>
-        <LineField
-          fr="Je soussigné"
-          en="I, the Undersigned"
-          name="soussigne"
-          value={data.soussigne}
-          onChange={set}
-        />
-
-        <LineField
-          fr="Sur la base du Constat de décès établi par"
-          en="Based on the death confirmed by"
-          name="constat"
-          value={data.constat}
-          onChange={set}
-        />
-
-        <div className="field field--right">
-          <span className="inline-label">Le/on</span>
-          <input
-            className="dots"
-            type="text"
-            name="leOn"
-            value={data.leOn ?? ""}
-            onChange={set}
-            aria-label="Le / on"
-          />
-        </div>
-
-        <LineField
-          fr="Atteste que :"
-          en="Affirms that"
-          name="atteste"
-          value={data.atteste}
-          onChange={set}
-        />
-
-        {/* Sexe */}
-        <div className="sexe">
-          <b className="sexe__title">Sexe/Sex :</b>
-
-          <Box
-            label="Masculin"
-            type="radio"
-            name="sexe"
-            checked={data.sexe === "M"}
-            onChange={() =>
-              setData((ancienneData) => ({
-                ...ancienneData,
-                sexe: "M",
-              }))
-            }
-          />
-
-          <Box
-            label="Féminin"
-            type="radio"
-            name="sexe"
-            checked={data.sexe === "F"}
-            onChange={() =>
-              setData((ancienneData) => ({
-                ...ancienneData,
-                sexe: "F",
-              }))
-            }
-          />
-        </div>
-
-        {/* Naissance et décès */}
-        <div className="duo">
-          <div className="duo__left">
-            <LineField
-              fr="Né(e) le :"
-              en="Born on"
-              name="nele"
-              value={data.nele}
-              onChange={set}
-            />
-          </div>
-
-          <div className="duo__right">
-            <div className="duo__cell">
-              <Label fr="est décédé le" en="died on" />
-
-              <input
-                className="dots"
-                type="text"
-                name="decedeLe"
-                value={data.decedeLe ?? ""}
-                onChange={set}
-                aria-label="Est décédé le"
-              />
-
-              <span className="inline-label">A</span>
-
-              <input
-                className="dots dots--short"
-                type="text"
-                name="a"
-                value={data.a ?? ""}
-                onChange={set}
-                aria-label="A"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="field field--right hm">
-          <span className="inline-label">heure(s)</span>
-          <input
-            className="dots dots--short"
-            type="text"
-            name="heures"
-            value={data.heures ?? ""}
-            onChange={set}
-            aria-label="Heures"
-          />
-
-          <span className="inline-label">minute(s)</span>
-          <input
-            className="dots dots--short"
-            type="text"
-            name="minutes"
-            value={data.minutes ?? ""}
-            onChange={set}
-            aria-label="Minutes"
-          />
-        </div>
-
-        <LineField
-          fr="Lieu du décès :"
-          en="Place of death"
-          name="lieu"
-          value={data.lieu}
-          onChange={set}
-        />
-
-        {/* Genre de mort */}
-        <div className="genre">
-          <Label fr="Genre de mort :" en="Cause of death" />
-
-          <div className="genre__grid">
-            <div className="genre__col">
-              {GENRES_GAUCHE.map((g) => (
-                <Box
-                  key={g.key}
-                  label={g.label}
-                  checked={!!genres[g.key]}
-                  onChange={() => toggleGenre(g.key)}
-                />
-              ))}
-            </div>
-
-            <div className="genre__col genre__col--right">
-              {GENRES_DROITE.map((g) => (
-                <Box
-                  key={g.key}
-                  label={g.label}
-                  checked={!!genres[g.key]}
-                  onChange={() => toggleGenre(g.key)}
-                />
-              ))}
-
-              <div className="autres">
-                <span className="autres__label">Autres</span>
-                <input
-                  className="dots dots--solid"
-                  type="text"
-                  name="autres"
-                  value={data.autres ?? ""}
-                  onChange={set}
-                  aria-label="Autres"
-                />
-              </div>
-
-              <div className="autres autres--precision">
-                <input
-                  className="dots dots--solid"
-                  type="text"
-                  name="autresPrecision"
-                  value={data.autresPrecision ?? ""}
-                  onChange={set}
-                  aria-label="Autres à préciser"
-                />
-                <span className="autres__label">(à préciser)</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Contagiosité */}
-        <section className="question">
-          <strong className="question__fr">
-            La dépouille présente-t-elle un risque de contagiosité particulier ?
-          </strong>
-
-          <span className="question__en">
-            Is the corpse presenting any risk of contamination?
-          </span>
-
-          <div className="choices">
-            {OUI_NON.map((o) => (
-              <Box
-                key={o.key}
-                label={o.label}
-                type="radio"
-                name="contagion"
-                checked={data.contagion === o.key}
-                onChange={() =>
-                  setData((ancienneData) => ({
-                    ...ancienneData,
-                    contagion: o.key,
-                  }))
-                }
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* Autopsie */}
-        <section className="question">
-          <strong className="question__fr">
-            Une autopsie a-t-elle été réalisée ?
-          </strong>
-
-          <span className="question__en">
-            Was an autopsy performed?
-          </span>
-
-          <div className="choices">
-            {OUI_NON.map((o) => (
-              <Box
-                key={o.key}
-                label={o.label}
-                type="radio"
-                name="autopsie"
-                checked={data.autopsie === o.key}
-                onChange={() =>
-                  setData((ancienneData) => ({
-                    ...ancienneData,
-                    autopsie: o.key,
-                  }))
-                }
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* Fait à, date et heure */}
-        <div className="fait">
-          <span className="fait__label">Fait à</span>
-          <input
-            className="dots"
-            type="text"
-            name="faitA"
-            value={data.faitA ?? ""}
-            onChange={set}
-            aria-label="Fait à"
-          />
-
-          <span className="fait__label">Le</span>
-          <input
-            className="dots"
-            type="text"
-            name="faitLe"
-            value={data.faitLe ?? ""}
-            onChange={set}
-            aria-label="Date d'établissement"
-          />
-
-          <span className="fait__label">Heure</span>
-          <input
-            className="dots"
-            type="text"
-            name="faitHeure"
-            value={data.faitHeure ?? ""}
-            onChange={set}
-            aria-label="Heure d'établissement"
-          />
-        </div>
-
-        <strong className="signature">
-          Signature et Cachet du Praticien
-        </strong>
-
-        {/* Noms enregistrés */}
-        {nomsCertificat.length > 0 && (
-          <div className="gm-noms">
-            <strong>Noms enregistrés</strong>
-            <ul>
-              {nomsCertificat.map((nom, index) => (
-                <li key={nom.id ?? index}>
-                  {typeof nom === "string"
-                    ? nom
-                    : nom.nom ?? nom.libelle ?? ""}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Boutons */}
-        <div className="gm-actions">
-          <button type="submit" disabled={enregistrement}>
-            {enregistrement
-              ? "Enregistrement..."
-              : certificatId
-                ? "Modifier le certificat"
-                : "Enregistrer le certificat"}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate("/certificatgenremort")}
-            disabled={enregistrement}
-          >
-            Retour à la sélection
-          </button>
-
-          <button
-            type="button"
-            onClick={() => window.print()}
-          >
-            Imprimer
-          </button>
-        </div>
-      </form>
-    </div>
-  );
 }
 
 export default GenreDeMort;

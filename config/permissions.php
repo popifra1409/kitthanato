@@ -131,6 +131,17 @@ return [
                 'view' => 'Consulter la corbeille',
             ],
         ],
+
+        'constatdeces' => [
+    'libelle' => 'Certificat de constat de décès',
+    'permissions' => [
+        'view'   => 'Consulter le certificat de constat de décès',
+        'create' => 'Créer un constat de décès',
+        'update' => 'Modifier un constat de décès',
+        'print'  => 'Imprimer un constat de décès',
+    ],
+],
+        
     ],
 
     /*

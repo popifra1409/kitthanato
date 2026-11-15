@@ -22,6 +22,8 @@ use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\CertificatGenreMortController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\RechercheController;
+use App\Http\Controllers\ConstatDecesController;
+
 /*
 |--------------------------------------------------------------------------
 | API REST
@@ -179,5 +181,27 @@ Route::get('/certificats-genre-mort/depot/{depotId}', [CertificatGenreMortContro
 Route::post('/certificats-genre-mort', [CertificatGenreMortController::class, 'store']);
 
 Route::put('/certificats-genre-mort/{id}', [CertificatGenreMortController::class,'update']);
+
+/* ---------- CONSTAT DE DÉCÈS ---------- */
+
+Route::get('/constat-deces/noms', [
+    ConstatDecesController::class, 'noms'
+])->middleware('permission:constatdeces.view');
+
+Route::post('/constat-deces/noms', [
+    ConstatDecesController::class, 'ajouterNom'
+])->middleware('permission:constatdeces.create');
+
+Route::get('/constat-deces/depot/{depotId}', [
+    ConstatDecesController::class, 'getByDepot'
+])->middleware('permission:constatdeces.view');
+
+Route::post('/constat-deces', [
+    ConstatDecesController::class, 'store'
+])->middleware('permission:constatdeces.create');
+
+Route::put('/constat-deces/{id}', [
+    ConstatDecesController::class, 'update'
+])->middleware('permission:constatdeces.update');
 
 });

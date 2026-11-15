@@ -151,6 +151,14 @@ function Navbar() {
             icon: "📝",
         });
     }
+    if (can("constatdeces.view")) {
+        documents.push({
+            to: "/constatdeces",
+            label: "Certificat de constat de décès",
+            description: "Éditer un constat",
+            icon: "📝",
+        });
+    }
     if (documents.length) {
         groupes.push({
             key: "documents",

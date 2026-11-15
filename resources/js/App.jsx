@@ -17,6 +17,7 @@ import DeclarationDeces from "./pages/DeclarationDeces";
 import { SessionProvider } from "./services/SessionContext";
 import GenreDeMort from "./pages/GenreDeMort";
 import Emplacements from "./pages/Emplacements";
+import CertificatConstatDeces from "./pages/CertificatConstatDeces";
 
 /* =====================================================
    ROUTES PROTÉGÉES
@@ -51,6 +52,16 @@ const PAGES = [
   path: "/certificatgenremort/:depotId",
   permission: "certificatgenremort.view",
   element: <GenreDeMort />,
+},
+{
+path: "/constatdeces",
+  permission: "constatdeces.view",
+  element: <CertificatConstatDeces />,
+},
+{
+  path: "/constatdeces/:depotId",
+  permission: "constatdeces.view",
+  element: <CertificatConstatDeces />,
 },
 ];
 

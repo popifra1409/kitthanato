@@ -15,7 +15,10 @@
    (error.message, error.status, error.errors, error.firstMessage).
 ============================================================ */
 
+
 import { get, post, put, del } from "./http";
+
+
 
 /* Normalise une réponse "liste" quelle que soit sa forme
    ([...], {data: [...]}, {depots: [...]}, pagination...). */
@@ -86,6 +89,19 @@ export const declarations = {
 
 export const statistiques = {
     get: (params) => get("/statistiques", params),
+};
+
+/* ---------------- CONSTAT DE DÉCÈS ---------------- */
+export const constats = {
+    ...ressource("constat-deces"),
+
+    /* Pré-remplissage depuis un dépôt */
+    prefill: (depotId) =>
+        get(`/depots/${depotId}/constat-prefill`),
+
+    /* Récupération du constat existant */
+    getByDepot: (depotId) =>
+        get(`/constat-deces/depot/${depotId}`),
 };
 
 /* ---------------- RÉFÉRENTIELS ---------------- */
@@ -161,6 +177,7 @@ const api = {
     levees,
     declarations,
     statistiques,
+    constats,
     prestations,
     chapelles,
     professions,
