@@ -120,6 +120,11 @@ export const professions = {
     create: (nom) => post("/professions", { nom }),
 };
 
+export const etats = {
+    list: (recherche = "") => get("/etats", { recherche }),
+    create: (nom) => post("/etats", { nom }),
+};
+
 export const services = {
     list: (recherche = "") => get("/services", { recherche }),
     create: (nom) => post("/services", { nom }),
@@ -181,6 +186,7 @@ const api = {
     prestations,
     chapelles,
     professions,
+    etats,
     services,
     emplacements,
     utilisateurs,

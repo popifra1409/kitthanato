@@ -23,6 +23,7 @@ use App\Http\Controllers\CertificatGenreMortController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\RechercheController;
 use App\Http\Controllers\ConstatDecesController;
+use App\Http\Controllers\EtatController;
 
 /*
 |--------------------------------------------------------------------------
@@ -57,10 +58,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/prestations', [PrestationController::class, 'index']);
     Route::get('/chapelles', [ChapelleController::class, 'index']);
     Route::get('/professions', [ProfessionController::class, 'index']);
+    Route::get('/etats', [EtatController::class, 'index']);
     Route::get('/services', [ServiceController::class, 'index']);
 
     /* Ajout rapide depuis le formulaire de dépôt */
     Route::post('/professions', [ProfessionController::class, 'store'])
+        ->middleware('permission:depots.create|depots.update|referentiels.manage');
+    Route::post('/etats', [EtatController::class, 'store'])
         ->middleware('permission:depots.create|depots.update|referentiels.manage');
     Route::post('/services', [ServiceController::class, 'store'])
         ->middleware('permission:depots.create|depots.update|referentiels.manage');

@@ -6,6 +6,7 @@ use App\Models\Caisson;
 use App\Models\ChambreFroide;
 use App\Models\Depot;
 use App\Models\Prestation;
+use App\Models\Etat;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -81,6 +82,17 @@ class DepotController extends Controller
         }
 
         return 'PRÉSENT';
+    }
+
+ private function memoriserEtat(?string $etat): ?string
+    {
+        $etat =trim((string) $etat);
+        if ($etat == '') {
+            return null;
+        }
+
+        $existant = Etat::whereRaw('LOWER(nom) = ?', [mb_strtolower($etat)]) ->first();
+        return ($existant ?? Etat::create(['nom' => $etat])) ->nom;
     }
 
     /* =========================================================
@@ -164,7 +176,7 @@ class DepotController extends Controller
             'service_origine' => 'nullable|string|max:150',
             'lieu_provenance' => 'nullable|string|max:200',
             'motif' => 'required|string|max:100',
-            'etat' => 'nullable|string|max:150',
+            'etat' => $this->memoriserEtat($data['etat'] ?? null),
             'emplacement' => ['nullable', 'string', 'max:100'],
             'caisson_id' => ['nullable', 'integer', 'exists:caissons,id'],
             'chapelle' => 'required|string|max:100',
@@ -412,7 +424,7 @@ class DepotController extends Controller
             'service_origine' => $data['service_origine'] ?? null,
             'lieu_provenance' => $data['lieu_provenance'] ?? null,
             'motif' => $data['motif'],
-            'etat' => $data['etat'] ?? null,
+            'etat' => $this->memoriserEtat($data['etat'] ?? null),
             'emplacement' => $emplacement,
             'caisson_id' => $caisson?->id ?? $depot->caisson_id,
             'chapelle' => $data['chapelle'],

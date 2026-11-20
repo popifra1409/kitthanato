@@ -6,7 +6,7 @@ import NotificationBox from "../components/NotificationBox";
 import Pagination from "../components/Pagination";
 import { usePagination } from "../utils/usePagination";
 
-import api, { asList } from "../services/api";
+import api, { asList, recherche } from "../services/api";
 import { hasPermission } from "../services/session";
 
 /* =========================================================
@@ -254,6 +254,12 @@ function DepotCorps() {
     const [professionRecherchee, setProfessionRecherchee] = useState("");
     const [afficherProfessions, setAfficherProfessions] = useState(false);
 
+    /* etats */
+    const [etats, setEtats] = useState([]);
+    const [etatRecherche, setEtatRecherche] = useState("");
+    const [afficherEtats, setAfficherEtats] = useState(false);
+
+
     /* Prestations */
     const [prestations, setPrestations] = useState([]);
     const [prestationsSelectionnees, setPrestationsSelectionnees] = useState([]);
@@ -494,6 +500,19 @@ function DepotCorps() {
         }
     };
 
+    const chargerEtats = async (recherche = "") => {
+         try {
+            const data = asList(
+                await api.etats.list(recherche),
+                "etats"
+            );
+            setEtats(data);
+        } catch (error) {
+            console.error("Erreur de chargement des etats :", error);
+            setEtats([]);
+        }
+    };
+
     const fetchPrestations = async () => {
         try {
             const data = asList(
@@ -533,6 +552,7 @@ function DepotCorps() {
     useEffect(() => {
         fetchDepots();
         chargerProfessions();
+        chargerEtats();
         chargerServices();
         fetchPrestations();
         chargerChapelles();
@@ -553,12 +573,14 @@ function DepotCorps() {
             if (e.type === "keydown") {
                 if (e.key === "Escape") {
                     setAfficherProfessions(false);
+                    setAfficherEtats(false);
                     setAfficherServices(false);
                 }
                 return;
             }
             if (!e.target.closest(".profession-container")) {
                 setAfficherProfessions(false);
+                setAfficherEtats(false);
                 setAfficherServices(false);
             }
         };
@@ -694,9 +716,35 @@ function DepotCorps() {
         }
     };
 
-    /* =====================================================
-       PRESTATIONS
-    ===================================================== */
+    const selectionnerEtat = (etat) => {
+        const nom = etat.nom || "";
+        setFormData((prev) => ({ ...prev, etat: nom}));
+        setEtatRecherche(nom);
+        setAfficherEtats(false);
+    };
+
+    const ajouterEtat = async () => {
+        const nom = etatRecherche.trim();
+        if (!nom) {
+            showNotif("error","Champ manquant","veuillez saisir l'etat du corps.");
+            return;
+        }
+        try {
+            const cree = await api.etats.create(nom);
+            const nouveau = cree?.nom || nom;
+            setFormData((prev) => ({ ...prev, etat: nouveau }));
+            setEtatRecherche(nouveau);
+            setAfficherEtats(false);
+            await chargerEtats();
+        } catch (error) {
+            console.error(error);
+            showNotif(
+                "error",
+                "Échec",
+                error.firstMessage || "Impossible d'ajouter l'etat'."
+            );
+        }
+    };
 
     /* =====================================================
        DÉPOSANTS
@@ -879,6 +927,8 @@ function DepotCorps() {
         });
         setProfessionRecherchee("");
         setAfficherProfessions(false);
+        setEtatRecherche("");
+        setAfficherEtats(false);
         setServiceRecherche("");
         setAfficherServices(false);
         setPrestationsSelectionnees([]);
@@ -943,6 +993,8 @@ function DepotCorps() {
         setPrestationsSelectionnees(selectedPrestations);
 
         setProfessionRecherchee(depot.profession || "");
+        setEtatRecherche(depot.etat || "");
+        setAfficherEtats(false);
         setServiceRecherche(depot.service_origine || "");
         setAfficherServices(false);
 
@@ -1164,6 +1216,49 @@ function DepotCorps() {
         } finally {
             setEnregistrement(false);
         }
+
+      const etatSaisi = (formData.etat || "").trim();
+
+let etatId = null;
+
+if (etatSaisi) {
+    try {
+        // Vérifier si l'état existe déjà
+        let etatExistant = etats.find(
+            (e) =>
+                e.nom.trim().toLowerCase() ===
+                etatSaisi.toLowerCase()
+        );
+
+        // Créer l'état s'il n'existe pas
+        if (!etatExistant) {
+            const resultat = await api.etats.create(etatSaisi);
+
+            etatExistant = resultat.etat || resultat;
+
+            setEtats((prev) => {
+                const existe = prev.some(
+                    (e) => e.id === etatExistant.id
+                );
+
+                return existe ? prev : [...prev, etatExistant];
+            });
+        }
+
+        etatId = etatExistant.id;
+
+    } catch (err) {
+        console.error("Erreur lors de la gestion de l'état :", err);
+
+        showNotif(
+            "error",
+            "Erreur",
+            err.firstMessage || "Impossible d'enregistrer l'état."
+        );
+
+        return;
+    }
+}
     };
 
     /* =====================================================
@@ -2157,17 +2252,67 @@ function DepotCorps() {
 
                                         <div className="form-group">
                                             <label>État du corps *</label>
-                                            <select
-                                                name="etat"
-                                                value={formData.etat}
-                                                onChange={handleChange}
-                                            >
-                                                <option value="">Sélectionner</option>
-                                                <option value="Bon état">Bon état</option>
-                                                <option value="État moyen">État moyen</option>
-                                                <option value="Dégradé">Dégradé</option>
-                                                <option value="Altéré">Altéré</option>
-                                            </select>
+                                            <div className="profession-container">
+                                                <input
+                                                    type="text"
+                                                    value={etatRecherche}
+                                                    onChange={(e) => {
+                                                        const valeur = e.target.value;
+                                                        setEtatRecherche(valeur);
+                                                        const etatSelectionne = etats.find(
+    (e) =>
+        e.nom.toLowerCase() ===
+        formData.etat.trim().toLowerCase()
+);
+
+const donneesDepot = {
+    ...formData,
+    etat_id: etatSelectionne?.id || null,
+};
+
+delete donneesDepot.etat;
+                                                        setAfficherEtats(true);
+                                                        chargerEtats(valeur);
+                                                    }}
+                                                    onFocus={() => {
+                                                        setAfficherEtats(true);
+                                                        chargerEtats(etatRecherche);
+                                                    }}
+                                                    autoComplete="off"
+                                                    placeholder="Choisir ou saisir un état..."
+                                                />
+                                                {afficherEtats && (
+                                                    <div className="profession-suggestions">
+                                                        {etats.map((e) => (
+                                                            <button
+                                                                type="button"
+                                                                key={e.id}
+                                                                className="profession-option"
+                                                                onClick={() =>
+                                                                    selectionnerEtat(e)
+                                                                }
+                                                            >
+                                                                {e.nom}
+                                                            </button>
+                                                        ))}
+                                                        {etatRecherche.trim() && !etats.some(
+                                                            (e) =>
+                                                                e.nom.toLowerCase() ==
+                                                            etatRecherche.trim().toLowerCase()
+                                                             ) && (
+                                                            <button
+                                                                type="button"
+                                                                className="profession-ajouter"
+                                                                onClick={ajouterEtat}
+                                                            >
+                                                                Ajouter «{" "}
+                                                                {etatRecherche.trim()}
+                                                                »
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
 
                                         <div className="form-group">
