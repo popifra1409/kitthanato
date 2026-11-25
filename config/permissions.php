@@ -86,7 +86,7 @@ return [
         ],
 
         'referentiels' => [
-            'libelle' => 'Référentiels (prestations, chapelles, services)',
+            'libelle' => 'Référentiels (prestations, chapelles, services, tarifs)',
             'permissions' => [
                 'manage' => 'Gérer prestations, chapelles et services',
             ],

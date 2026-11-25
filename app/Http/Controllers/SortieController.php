@@ -138,10 +138,11 @@ class SortieController extends Controller
 
             $dateSortie = Carbon::parse($data['date']);
 
-            $jours = max(
-                0,
-                (int) $dateArrivee->diffInDays($dateSortie)
-            );
+            $jours = $dateSortie->lt($dateArrivee)
+    ? 0
+    : (int) $dateArrivee->copy()->startOfDay()
+        ->diffInDays($dateSortie->copy()->startOfDay()) + 1;
+        
             $prixCaisse   = $this->prixCaisse($depot);
             $montantNuits = $jours * $prixCaisse;
 

@@ -77,10 +77,12 @@ const calculerNombreNuits = (dateArrivee, dateSortie) => {
         return 0;
     }
 
-    const difference =
-        (fin.getTime() - debut.getTime()) / (1000 * 60 * 60 * 24);
+    const difference = Math.round(
+    (fin.getTime() - debut.getTime()) / (1000 * 60 * 60 * 24)
+);
 
-    return Math.max(0, Math.floor(difference));
+// sortie avant l'arrivée : 0 ; sinon chaque date touchée compte
+return difference < 0 ? 0 : difference + 1;
 };
 
 
