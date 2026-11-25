@@ -24,6 +24,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\RechercheController;
 use App\Http\Controllers\ConstatDecesController;
 use App\Http\Controllers\EtatController;
+use App\Http\Controllers\TarifConservationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -100,6 +101,15 @@ Route::put('/depots/{id}/desceller', [DepotController::class, 'desceller'])->mid
         Route::put('/caissons/{caisson}', [ChambreFroideController::class, 'updateCaisson']);
         Route::put('/caissons/{caisson}/actif', [ChambreFroideController::class, 'toggleCaissonActif']);
     });
+
+    
+// Lecture : accessible à tous les utilisateurs connectés (le formulaire de sortie en a besoin)
+Route::get('/tarifs-conservation', [TarifConservationController::class, 'index']);
+
+// Modification : mettez ici le même middleware que vos routes prestations/chapelles
+// (permission referentiels.manage)
+Route::put('/tarifs-conservation/{id}', [TarifConservationController::class, 'update']);
+
 
     /* ---------- SORTIES ---------- */
     Route::middleware('permission:sorties.view')->group(function () {

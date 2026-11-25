@@ -84,15 +84,16 @@ class DepotController extends Controller
         return 'PRÉSENT';
     }
 
- private function memoriserEtat(?string $etat): ?string
+    private function memoriserEtat(?string $etat): ?string
     {
-        $etat =trim((string) $etat);
-        if ($etat == '') {
+        $etat = trim((string) $etat);
+        if ($etat === '') {
             return null;
         }
 
-        $existant = Etat::whereRaw('LOWER(nom) = ?', [mb_strtolower($etat)]) ->first();
-        return ($existant ?? Etat::create(['nom' => $etat])) ->nom;
+        $existant = Etat::whereRaw('LOWER(nom) = ?', [mb_strtolower($etat)])->first();
+
+        return ($existant ?? Etat::create(['nom' => $etat]))->nom;
     }
 
     /* =========================================================
@@ -176,7 +177,10 @@ class DepotController extends Controller
             'service_origine' => 'nullable|string|max:150',
             'lieu_provenance' => 'nullable|string|max:200',
             'motif' => 'required|string|max:100',
-            'etat' => $this->memoriserEtat($data['etat'] ?? null),
+
+            /* ✅ RÈGLE VALIDE (au lieu de $this->memoriserEtat(...)) */
+            'etat' => 'nullable|string|max:150',
+
             'emplacement' => ['nullable', 'string', 'max:100'],
             'caisson_id' => ['nullable', 'integer', 'exists:caissons,id'],
             'chapelle' => 'required|string|max:100',
@@ -200,6 +204,9 @@ class DepotController extends Controller
         }
 
         $data = $validator->validated();
+
+        /* ✅ Normalisation de l'état APRÈS validation */
+        $data['etat'] = $this->memoriserEtat($data['etat'] ?? null);
 
         $principaux = collect($data['depositants'])
             ->where('statut', 'principal')
@@ -251,7 +258,7 @@ class DepotController extends Controller
                 'service_origine' => $data['service_origine'] ?? null,
                 'lieu_provenance' => $data['lieu_provenance'] ?? null,
                 'motif' => $data['motif'],
-                'etat' => $data['etat'] ?? null,
+                'etat' => $data['etat'] ?? null,             // ✅ déjà normalisé
                 'emplacement' => $emplacement,
                 'caisson_id' => $caisson?->id,
                 'chapelle' => $data['chapelle'],
@@ -537,35 +544,29 @@ class DepotController extends Controller
      * Retourne le caisson s'il est attribuable, sinon interrompt la requête
      * avec un 422 explicite (mêmes règles que l'attribution manuelle).
      */
-    private function caissonAttribuable(int $caissonId, int $depotId = 0): Caisson
-    {
-        $caisson = Caisson::with('chambreFroide')->find($caissonId);
+ private function caissonAttribuable(int $caissonId, int $depotId = 0): Caisson
+{
+    $caisson = Caisson::with('chambreFroide')->find($caissonId);
 
-        if (!$caisson) {
-            abort(response()->json([
-                'message' => 'Caisson invalide.',
-                'errors' => ['caisson_id' => ['Le caisson sélectionné est introuvable.']],
-            ], 422));
-        }
-
-        if (!$caisson->actif || !$caisson->chambreFroide?->actif) {
-            abort(response()->json([
-                'message' => "Le caisson {$caisson->code} est désactivé : il ne peut pas être attribué.",
-                'errors' => ['caisson_id' => ["Le caisson {$caisson->code} est désactivé."]],
-            ], 422));
-        }
-
-        if ($caisson->chambreFroide->type === 'individuelle'
-            && $this->caissonOccupeParUnAutre($caisson->id, $depotId)) {
-            abort(response()->json([
-                'message' => "Le caisson {$caisson->code} est déjà occupé. "
-                           . "Une chambre individuelle ne peut accueillir qu'un seul corps.",
-                'errors' => ['caisson_id' => ['Ce caisson est déjà occupé.']],
-            ], 422));
-        }
-
-        return $caisson;
+    if (!$caisson) {
+        abort(response()->json([
+            'message' => 'Caisson invalide.',
+            'errors' => ['caisson_id' => ['Le caisson sélectionné est introuvable.']],
+        ], 422));
     }
+
+    if (!$caisson->actif || !$caisson->chambreFroide?->actif) {
+        abort(response()->json([
+            'message' => "Le caisson {$caisson->code} est désactivé : il ne peut pas être attribué.",
+            'errors' => ['caisson_id' => ["Le caisson {$caisson->code} est désactivé."]],
+        ], 422));
+    }
+
+    // ✅ Plus de blocage "chambre individuelle déjà occupée".
+    //    Un caisson peut recevoir plusieurs corps, quel que soit le type de chambre.
+
+    return $caisson;
+}
 
     /* =========================================================
        SUPPRIMER
@@ -625,48 +626,46 @@ class DepotController extends Controller
        `depot_id` exclut le corps courant du décompte (réattribution).
     ========================================================= */
 
-    public function caissonsDisponibles(Request $request)
-    {
-        $depotId = $request->integer('depot_id') ?: null;
+   public function caissonsDisponibles(Request $request)
+{
+    $depotId = $request->integer('depot_id') ?: null;
 
-        $occupations = Depot::query()
-            ->selectRaw('caisson_id, COUNT(*) as total')
-            ->whereNotNull('caisson_id')
-            ->when($depotId, fn ($q) => $q->whereKeyNot($depotId))
-            ->presents()
-            ->groupBy('caisson_id')
-            ->pluck('total', 'caisson_id');
+    $occupations = Depot::query()
+        ->selectRaw('caisson_id, COUNT(*) as total')
+        ->whereNotNull('caisson_id')
+        ->when($depotId, fn ($q) => $q->whereKeyNot($depotId))
+        ->presents()
+        ->groupBy('caisson_id')
+        ->pluck('total', 'caisson_id');
 
-        $chambres = ChambreFroide::query()
-            ->where('actif', true)
-            ->with(['caissons' => fn ($q) => $q->where('actif', true)])
-            ->orderBy('nom')
-            ->get()
-            ->map(function ($chambre) use ($occupations) {
-                $individuelle = $chambre->type === 'individuelle';
+    $chambres = ChambreFroide::query()
+        ->where('actif', true)
+        ->with(['caissons' => fn ($q) => $q->where('actif', true)])
+        ->orderBy('nom')
+        ->get()
+        ->map(function ($chambre) use ($occupations) {
+            return [
+                'id' => $chambre->id,
+                'nom' => $chambre->nom,
+                'type' => $chambre->type,
+                'caissons' => $chambre->caissons->map(function ($caisson) use ($occupations) {
+                    $occupants = (int) ($occupations[$caisson->id] ?? 0);
 
-                return [
-                    'id' => $chambre->id,
-                    'nom' => $chambre->nom,
-                    'type' => $chambre->type,
-                    'caissons' => $chambre->caissons->map(function ($caisson) use ($individuelle, $occupations) {
-                        $occupants = (int) ($occupations[$caisson->id] ?? 0);
+                    return [
+                        'id' => $caisson->id,
+                        'code' => $caisson->code,
+                        'occupants' => $occupants,
+                        'capacite' => null,        // ✅ plus de capacité imposée
+                        'disponible' => true,      // ✅ toujours disponible si actif
+                    ];
+                })->values(),
+            ];
+        })
+        ->filter(fn ($chambre) => $chambre['caissons']->isNotEmpty())
+        ->values();
 
-                        return [
-                            'id' => $caisson->id,
-                            'code' => $caisson->code,
-                            'occupants' => $occupants,
-                            'capacite' => $individuelle ? 1 : null,
-                            'disponible' => !$individuelle || $occupants === 0,
-                        ];
-                    })->values(),
-                ];
-            })
-            ->filter(fn ($chambre) => $chambre['caissons']->isNotEmpty())
-            ->values();
-
-        return response()->json(['chambres' => $chambres]);
-    }
+    return response()->json(['chambres' => $chambres]);
+}
 
     /* =========================================================
        SCELLER / DESCELLER

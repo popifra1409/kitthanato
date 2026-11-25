@@ -1,4 +1,11 @@
 /* =========================================================
+   PLANNING DES LEVÉES — STYLE "TABLEAU DES DÉPARTS"
+   Panneau sombre, tuiles à palettes, teintes violettes
+========================================================= */
+
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Roboto+Mono:wght@500;700&display=swap");
+
+/* =========================================================
    RESET
 ========================================================= */
 
@@ -26,7 +33,7 @@
     --lv-text-muted: #95839e;
     --lv-primary: #6d28d9;
     --lv-primary-soft: #8b5cf6;
-    --lv-accent: #d6a928;
+    --lv-accent: #8b5cf6;
     --lv-green: #37794d;
     --lv-green-bg: #e5f4eb;
     --lv-orange: #9a7028;
@@ -34,6 +41,42 @@
     --lv-purple: #74408d;
     --lv-purple-bg: #eee3f5;
     --lv-shadow: 0 8px 28px rgba(67, 29, 87, 0.07);
+
+    /* =====================================================
+       PALETTE DU TABLEAU — toutes les couleurs sont ici
+       (fonds sombres violets + 1 accent + 4 statuts)
+    ===================================================== */
+
+    /* Fonds (du plus sombre au plus clair) */
+    --bd-night: #0f0820;        /* fond du tableau */
+    --bd-panel-deep: #150a2e;   /* en-têtes de colonnes, pied */
+    --bd-panel: #1a0f36;        /* panneaux */
+    --bd-panel-2: #251550;      /* haut des panneaux */
+    --bd-panel-3: #2b1660;      /* bandeau */
+    --bd-line: rgba(196, 161, 255, 0.14);
+
+    /* Textes sur fond sombre (contrastes élevés) */
+    --bd-text-strong: #f8f3ff;  /* infos principales : heure, date, nom */
+    --bd-text: #dccff5;         /* texte courant */
+    --bd-muted: #b3a3d6;        /* petits libellés */
+
+    /* Accent unique : lavande (titres, boutons, repères) */
+    --bd-accent: #c9a9ff;
+    --bd-accent-deep: #8b5cf6;
+    --bd-warm: #f8f3ff;         /* chiffres des tuiles */
+
+    /* Pastille de la chapelle */
+    --bd-pill-from: #8b5cf6;
+    --bd-pill-to: #5b21b6;
+
+    /* Statuts */
+    --bd-green: #4ade80;
+    --bd-orange: #fbbf24;
+    --bd-red: #fb7185;
+
+    --lv-display: "Barlow Condensed", "Bahnschrift", "DIN Alternate",
+        "Arial Narrow", sans-serif;
+    --lv-mono: "Roboto Mono", "SF Mono", Consolas, "Courier New", monospace;
 
     min-height: 100vh;
     padding: 30px 40px 55px;
@@ -75,59 +118,251 @@ body.dark-mode .levees-page {
 }
 
 /* =========================================================
-   HEADER
+   TUILES À PALETTES (heure, code, compteur)
+========================================================= */
+
+.flaps {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    vertical-align: middle;
+    perspective: 500px;
+}
+
+.flaps-md {
+    --fw: 22px;
+    --fh: 32px;
+    --fs: 18px;
+}
+
+.flaps-lg {
+    --fw: 30px;
+    --fh: 44px;
+    --fs: 26px;
+}
+
+.flaps-sm {
+    --fw: 15px;
+    --fh: 24px;
+    --fs: 13px;
+    gap: 2px;
+}
+
+.flap {
+    position: relative;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: var(--fw);
+    height: var(--fh);
+
+    color: var(--bd-warm);
+    font: 700 var(--fs) / 1 var(--lv-mono);
+
+    background: linear-gradient(
+        180deg,
+        #3d2874 0%,
+        #2b1a56 49.5%,
+        #120a2a 50.5%,
+        #1f1242 100%
+    );
+    border-radius: 4px;
+
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09),
+        0 3px 6px rgba(0, 0, 0, 0.45);
+
+    animation: flapIn 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+/* ligne de charnière au milieu de la tuile */
+.flap::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: rgba(0, 0, 0, 0.7);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.flap-sep {
+    color: var(--bd-accent);
+    font: 700 var(--fs) / 1 var(--lv-mono);
+    padding: 0 1px;
+}
+
+.flap-gap {
+    display: inline-block;
+    width: 8px;
+}
+
+.flaps-plain {
+    color: var(--bd-warm);
+    font: 700 13px / 1.2 var(--lv-mono);
+    letter-spacing: 0.04em;
+}
+
+/* l'horloge clignote sur les deux-points */
+.levees-clock .flap-sep {
+    animation: sepBlink 1s steps(2, start) infinite;
+}
+
+@keyframes flapIn {
+    from {
+        transform: rotateX(-90deg);
+        opacity: 0;
+    }
+    to {
+        transform: rotateX(0deg);
+        opacity: 1;
+    }
+}
+
+@keyframes sepBlink {
+    to {
+        visibility: hidden;
+    }
+}
+
+/* =========================================================
+   HEADER — panneau du terminal
 ========================================================= */
 
 .levees-header {
-    min-height: 105px;
+    position: relative;
+    overflow: hidden;
+
+    min-height: 120px;
 
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 24px;
 
+    padding: 22px 32px;
+    margin-bottom: 18px;
 
+    border: 1px solid rgba(196, 161, 255, 0.35);
+    border-radius: 18px;
+
+    background: linear-gradient(
+        120deg,
+        #0f0820 0%,
+        #2a1458 55%,
+        #4c1d95 100%
+    );
+
+    box-shadow: 0 16px 40px rgba(20, 10, 50, 0.28);
+}
+
+/* filet lavande en haut du panneau */
+.levees-header::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 3px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        var(--bd-accent),
+        transparent
+    );
+}
+
+/* halo discret à droite */
+.levees-header::after {
+    content: "";
+    position: absolute;
+    right: -80px;
+    top: -80px;
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle,
+        rgba(196, 161, 255, 0.28),
+        transparent 65%
+    );
+    pointer-events: none;
 }
 
 body.dark-mode .levees-header {
-    background: linear-gradient(120deg, #3b0764, #5b21b6);
-    box-shadow: 0 12px 30px #54209e;
+    border-color: rgba(196, 161, 255, 0.3);
 }
 
 .levees-title {
+    position: relative;
+    z-index: 1;
+
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
+}
+
+.levees-kicker {
+    color: var(--bd-accent);
+    font: 700 11px / 1 var(--lv-mono);
+    letter-spacing: 0.35em;
 }
 
 .levees-title strong {
-    color: #54209e;
-    font-size: 23px;
-    font-weight: 900;
-    letter-spacing: 2px;
+    color: #f7f0ff;
+    font-family: var(--lv-display);
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.levees-header-right {
+    position: relative;
+    z-index: 1;
+
+    display: flex;
+    align-items: center;
+    gap: 28px;
+}
+
+.levees-clock {
+    padding: 8px 12px;
+
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+
+    background: rgba(0, 0, 0, 0.35);
 }
 
 .levees-date {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 4px;
+    gap: 5px;
 }
 
 .levees-date strong {
-    color: #54209e;
-    font-size: 15px;
-    text-transform: capitalize;
+    color: var(--bd-accent);
+    font-family: var(--lv-display);
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
 }
 
 .levees-date small {
-    color: #54209e;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
+    color: var(--bd-muted);
+    font: 500 11px / 1 var(--lv-mono);
+    letter-spacing: 0.08em;
 }
 
 body.dark-mode .levees-date small {
-    color: #c084fc;
+    color: var(--bd-muted);
 }
 
 /* =========================================================
@@ -165,17 +400,15 @@ body.dark-mode .levees-error {
 
     gap: 14px;
 
-    padding: 16px 18px;
-    margin-bottom: 16px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
 
-    border: 1px solid var(--lv-border);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 14px;
 
-    background: var(--lv-surface);
+    background: linear-gradient(180deg, var(--bd-panel-2), var(--bd-panel));
 
-    box-shadow: 0 6px 20px rgba(68, 30, 88, 0.06);
-
-    transition: background 0.25s ease, border-color 0.25s ease;
+    box-shadow: 0 10px 28px rgba(15, 8, 40, 0.22);
 }
 
 /* ------- RECHERCHE ------- */
@@ -192,22 +425,22 @@ body.dark-mode .levees-error {
 
     padding: 0 15px;
 
-    border: 1px solid var(--lv-border);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 10px;
 
-    background: var(--lv-surface-soft);
+    background: rgba(255, 255, 255, 0.05);
 
     transition: 0.2s ease;
 }
 
 .levees-search:focus-within {
-    border-color: var(--lv-primary-soft);
-    background: var(--lv-surface);
-    box-shadow: 0 0 0 3px rgba(136, 129, 228, 0.1);
+    border-color: var(--bd-accent);
+    background: rgba(196, 161, 255, 0.06);
+    box-shadow: 0 0 0 3px rgba(196, 161, 255, 0.12);
 }
 
 .levees-search span {
-    color: var(--lv-purple);
+    color: var(--bd-accent);
     font-size: 24px;
 }
 
@@ -219,13 +452,16 @@ body.dark-mode .levees-error {
     outline: none;
 
     background: transparent;
-    color: var(--lv-text);
+    color: var(--bd-warm);
+    caret-color: var(--bd-accent);
 
-    font-size: 14px;
+    font-family: var(--lv-mono);
+    font-size: 13px;
+    letter-spacing: 0.03em;
 }
 
 .levees-search input::placeholder {
-    color: var(--lv-text-muted);
+    color: var(--bd-muted);
 }
 
 /* ------- FILTRE ------- */
@@ -237,30 +473,40 @@ body.dark-mode .levees-error {
 }
 
 .levees-filter label {
-    color: var(--lv-text-muted);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.8px;
+    color: var(--bd-accent);
+    font: 700 11px / 1 var(--lv-mono);
+    letter-spacing: 0.2em;
 }
 
 .levees-filter select {
     height: 48px;
-    min-width: 160px;
+    min-width: 170px;
 
     padding: 0 13px;
 
-    border: 1px solid var(--lv-border);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 9px;
 
     outline: none;
 
-    background: var(--lv-surface-soft);
-    color: var(--lv-purple);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--bd-warm);
 
-    font-size: 13px;
-    font-weight: 800;
+    font-family: var(--lv-display);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
 
     cursor: pointer;
+}
+
+.levees-filter select:focus {
+    border-color: var(--bd-accent);
+}
+
+.levees-filter select option {
+    background: var(--bd-panel);
+    color: var(--bd-warm);
 }
 
 /* ------- NAVIGATION SEMAINES ------- */
@@ -279,11 +525,11 @@ body.dark-mode .levees-error {
     align-items: center;
     justify-content: center;
 
-    border: 1px solid var(--lv-border);
+    border: 1px solid rgba(196, 161, 255, 0.45);
     border-radius: 9px;
 
-    background: var(--lv-surface);
-    color: var(--lv-purple);
+    background: transparent;
+    color: var(--bd-accent);
 
     font-size: 20px;
     font-weight: 800;
@@ -293,38 +539,40 @@ body.dark-mode .levees-error {
 }
 
 .week-btn:hover {
-    background: var(--lv-purple-bg);
-    border-color: var(--lv-primary-soft);
+    background: rgba(196, 161, 255, 0.12);
+    border-color: var(--bd-accent);
 }
 
 .week-btn-today {
     height: 42px;
-    padding: 0 16px;
+    padding: 0 18px;
 
-    border: 1px solid var(--lv-border);
+    border: 1px solid rgba(196, 161, 255, 0.45);
     border-radius: 9px;
 
-    background: var(--lv-surface);
-    color: var(--lv-purple);
+    background: transparent;
+    color: var(--bd-accent);
 
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.5px;
+    font-family: var(--lv-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
 
     cursor: pointer;
     transition: 0.2s;
 }
 
 .week-btn-today:hover {
-    background: var(--lv-purple-bg);
-    border-color: var(--lv-primary-soft);
+    background: rgba(196, 161, 255, 0.12);
+    border-color: var(--bd-accent);
 }
 
 .week-btn-today.active {
-    background: linear-gradient(135deg, #6d28d9, #8b5cf6);
-    color: white;
+    background: linear-gradient(135deg, #d9c2ff, var(--bd-accent-deep));
+    color: #1a0b36;
     border-color: transparent;
-    box-shadow: 0 5px 15px rgba(109, 40, 217, 0.25);
+    box-shadow: 0 6px 18px rgba(139, 92, 246, 0.45);
 }
 
 /* ------- REFRESH ------- */
@@ -337,11 +585,11 @@ body.dark-mode .levees-error {
     align-items: center;
     justify-content: center;
 
-    border: 1px solid var(--lv-border);
+    border: 1px solid rgba(196, 161, 255, 0.45);
     border-radius: 10px;
 
-    background: var(--lv-surface);
-    color: var(--lv-purple);
+    background: transparent;
+    color: var(--bd-accent);
 
     font-size: 22px;
 
@@ -350,8 +598,8 @@ body.dark-mode .levees-error {
 }
 
 .levees-refresh:hover {
-    background: var(--lv-purple-bg);
-    border-color: var(--lv-primary-soft);
+    background: rgba(196, 161, 255, 0.12);
+    border-color: var(--bd-accent);
     transform: rotate(90deg);
 }
 
@@ -362,14 +610,12 @@ body.dark-mode .levees-error {
 .levees-board {
     overflow: hidden;
 
-    border: 1px solid var(--lv-border);
-    border-radius: 17px;
+    border: 1px solid rgba(196, 161, 255, 0.3);
+    border-radius: 18px;
 
-    background: var(--lv-surface);
+    background: var(--bd-night);
 
-    box-shadow: var(--lv-shadow);
-
-    transition: background 0.25s ease, border-color 0.25s ease;
+    box-shadow: 0 22px 60px rgba(15, 8, 40, 0.35);
 }
 
 /* =========================================================
@@ -377,57 +623,68 @@ body.dark-mode .levees-error {
 ========================================================= */
 
 .departure-banner {
-    min-height: 78px;
+    position: relative;
+
+    min-height: 82px;
 
     display: flex;
     align-items: center;
     justify-content: space-between;
 
-    padding: 0 25px;
+    padding: 0 28px;
 
-    background: linear-gradient(90deg, #f0e5f6, #faf8fc);
+    background: linear-gradient(90deg, var(--bd-panel-3), var(--bd-panel));
 
-    border-bottom: 1px solid var(--lv-border);
+    border-bottom: 1px solid var(--bd-line);
 }
 
-body.dark-mode .departure-banner {
-    background: linear-gradient(90deg, #2a1a3d, #1e1530);
+/* marquage jaune de piste sous le bandeau */
+.departure-banner::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: repeating-linear-gradient(
+        90deg,
+        var(--bd-accent) 0 22px,
+        transparent 22px 36px
+    );
+    opacity: 0.8;
 }
 
 .departure-banner strong {
-    color: #54209e;;
-    font-size: 18px;
-    font-weight: 900;
-    letter-spacing: 1px;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+
+    color: var(--bd-accent);
+    font-family: var(--lv-display);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+}
+
+.departure-banner > div:first-child strong::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background: var(--bd-accent);
+    box-shadow: 0 0 14px var(--bd-accent);
 }
 
 .departure-number {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
 }
 
 .departure-number small {
-    color: var(--lv-text-soft);
-    font-size: 11px;
-    font-weight: 800;
-}
-
-.departure-number strong {
-    width: 42px;
-    height: 42px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    border-radius: 50%;
-
-    background: linear-gradient(135deg, #6d28d9, #8b5cf6);
-    color: white;
-
-    font-size: 15px;
-    font-weight: 800;
+    color: var(--bd-muted);
+    font: 700 11px / 1 var(--lv-mono);
+    letter-spacing: 0.25em;
 }
 
 /* =========================================================
@@ -439,30 +696,41 @@ body.dark-mode .departure-banner {
 
     grid-template-columns:
         125px
-        105px
-        minmax(175px, 1.1fr)
-        120px
-        minmax(190px, 1.4fr)
-        155px;
+        175px
+        minmax(170px, 1fr)
+        200px
+        minmax(200px, 1.4fr)
+        175px;
 
-    min-height: 58px;
+    min-height: 60px;
 
     align-items: center;
 
-    background: var(--lv-surface-soft);
+    background: var(--bd-panel-deep);
 
-    border-bottom: 1px solid var(--lv-border);
+    border-bottom: 1px solid var(--bd-line);
 
-    color: var(--lv-text-muted);
+    color: var(--bd-accent);
 
-    font-size: 11px;
-    font-weight: 900;
+    font-family: var(--lv-display);
+    font-size: 15px;
+    font-weight: 700;
 
-    letter-spacing: 0.8px;
+    letter-spacing: 0.22em;
 }
 
 .levees-columns > div {
-    padding: 0 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+
+    padding: 0 18px;
+}
+
+.levees-columns > div small {
+    color: var(--bd-muted);
+    font: 500 9px / 1 var(--lv-mono);
+    letter-spacing: 0.3em;
 }
 
 /* =========================================================
@@ -474,34 +742,34 @@ body.dark-mode .departure-banner {
 
     grid-template-columns:
         125px
-        105px
-        minmax(175px, 1.1fr)
-        120px
-        minmax(190px, 1.4fr)
-        155px;
+        175px
+        minmax(170px, 1fr)
+        200px
+        minmax(200px, 1.4fr)
+        175px;
 
-    min-height: 88px;
+    min-height: 84px;
 
     align-items: center;
 
-    border-bottom: 1px solid var(--lv-border-soft);
+    border-bottom: 1px solid var(--bd-line);
 
     transition: 0.18s;
 }
 
-.levee-row:hover {
-    background: var(--lv-surface-soft);
-    box-shadow: inset 4px 0 #914eb2;
+.levee-row:nth-child(even) {
+    background: rgba(255, 255, 255, 0.025);
 }
 
-body.dark-mode .levee-row:hover {
-    box-shadow: inset 4px 0 #a78bfa;
+.levee-row:hover {
+    background: rgba(196, 161, 255, 0.07);
+    box-shadow: inset 4px 0 var(--bd-accent);
 }
 
 .levee-row > div {
-    padding: 0 15px;
+    padding: 0 18px;
 
-    color: var(--lv-text-soft);
+    color: var(--bd-text);
     font-size: 13px;
 }
 
@@ -510,50 +778,56 @@ body.dark-mode .levee-row:hover {
 ========================================================= */
 
 .levee-date-cell strong {
-    color: var(--lv-text-soft);
-    font-size: 13px;
-    font-weight: 700;
+    color: var(--bd-text-strong);
+    font: 500 14px / 1 var(--lv-mono);
+    letter-spacing: 0.02em;
+    font-size: 16px;
 }
 
 .levee-time-cell strong {
-    color: var(--lv-purple);
-    font-size: 20px;
-    font-weight: 900;
+    display: inline-block;
+    font-weight: 400;
+    color: var(--bd-text-strong);
+    font-size: 18px;
 }
 
+/* la chapelle ressemble à un numéro de porte d'embarquement :
+   pastille violette, texte blanc (contraste élevé) */
 .levee-chapelle-cell span {
     display: inline-block;
 
-    padding: 8px 11px;
+    padding: 7px 16px;
 
-    border-radius: 8px;
+    border-radius: 6px;
 
-    background: var(--lv-purple-bg);
-    color: var(--lv-purple);
+    background: linear-gradient(135deg, var(--bd-pill-from), var(--bd-pill-to));
+    color: #ffffff;
 
-    font-size: 12px;
-    font-weight: 900;
+    font-family: var(--lv-display);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+
+    box-shadow: 0 0 0 2px rgba(201, 169, 255, 0.35),
+        0 6px 16px rgba(91, 33, 182, 0.55);
 }
 
 .levee-code {
     display: inline-block;
-
-    padding: 8px 11px;
-
-    border-radius: 8px;
-
-    background: var(--lv-purple-bg);
-    color: var(--lv-purple);
-
-    font-size: 12px;
-    font-weight: 900;
-    letter-spacing: 0.5px;
+    padding: 0;
+    background: none;
+    color: var(--bd-text-strong);
+    font-size: 18px;
 }
 
 .levee-defunt strong {
-    color: var(--lv-text);
-    font-size: 14px;
-    font-weight: 700;
+    color: var(--bd-text-strong);
+    font-family: var(--lv-display);
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
 }
 
 /* =========================================================
@@ -563,14 +837,17 @@ body.dark-mode .levee-row:hover {
 .levee-status {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
 
-    padding: 8px 12px;
+    padding: 8px 14px;
 
+    border: 1px solid currentColor;
     border-radius: 20px;
 
-    font-size: 11px;
-    font-weight: 900;
+    font-family: var(--lv-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
 
     white-space: nowrap;
 }
@@ -580,21 +857,41 @@ body.dark-mode .levee-row:hover {
     height: 8px;
     border-radius: 50%;
     background: currentColor;
+    box-shadow: 0 0 8px currentColor;
 }
 
 .levee-status.planifie {
-    background: var(--lv-purple-bg);
-    color: var(--lv-purple);
+    background: rgba(196, 161, 255, 0.14);
+    color: var(--bd-accent);
 }
 
 .levee-status.confirme {
-    background: var(--lv-green-bg);
-    color: var(--lv-green);
+    background: rgba(74, 222, 128, 0.12);
+    color: var(--bd-green);
 }
 
 .levee-status.attente {
-    background: var(--lv-orange-bg);
-    color: var(--lv-orange);
+    background: rgba(251, 191, 36, 0.12);
+    color: var(--bd-orange);
+    animation: statusBlink 1.4s ease-in-out infinite;
+}
+
+.levee-status.planifie .status-dot,
+.levee-status.confirme .status-dot {
+    animation: dotPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusBlink {
+    50% {
+        opacity: 0.45;
+    }
+}
+
+@keyframes dotPulse {
+    50% {
+        opacity: 0.35;
+        transform: scale(0.8);
+    }
 }
 
 /* =========================================================
@@ -609,12 +906,13 @@ body.dark-mode .levee-row:hover {
     align-items: center;
     justify-content: center;
 
-    gap: 12px;
+    gap: 14px;
 
-    color: var(--lv-text-muted);
-    font-size: 13px;
-    font-weight: 800;
-    letter-spacing: 1px;
+    color: var(--bd-muted);
+    font-family: var(--lv-display);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
 }
 
 .empty-icon,
@@ -626,10 +924,11 @@ body.dark-mode .levee-row:hover {
     align-items: center;
     justify-content: center;
 
+    border: 1px solid rgba(196, 161, 255, 0.35);
     border-radius: 50%;
 
-    background: var(--lv-purple-bg);
-    color: var(--lv-purple);
+    background: rgba(196, 161, 255, 0.1);
+    color: var(--bd-accent);
 
     font-size: 22px;
 }
@@ -648,6 +947,17 @@ body.dark-mode .levee-row:hover {
 }
 
 /* =========================================================
+   PAGINATION (composant existant, posé sur une plaque claire)
+========================================================= */
+
+.board-pagination {
+    padding: 12px 18px;
+
+    background: var(--lv-surface);
+    border-top: 1px solid var(--lv-border);
+}
+
+/* =========================================================
    FOOTER
 ========================================================= */
 
@@ -658,17 +968,16 @@ body.dark-mode .levee-row:hover {
     align-items: center;
     justify-content: space-between;
 
-    padding: 0 20px;
+    padding: 0 24px;
 
-    background: var(--lv-surface-soft);
+    background: var(--bd-panel-deep);
 
-    border-top: 1px solid var(--lv-border);
+    border-top: 1px solid var(--bd-line);
 
-    color: var(--lv-text-muted);
-    font-size: 11px;
-    font-weight: 800;
+    color: var(--bd-muted);
+    font: 500 11px / 1 var(--lv-mono);
 
-    letter-spacing: 0.5px;
+    letter-spacing: 0.14em;
 }
 
 /* =========================================================
@@ -686,7 +995,7 @@ body.dark-mode .levee-row:hover {
 
     .levees-columns,
     .levee-row {
-        min-width: 1050px;
+        min-width: 1150px;
     }
 }
 
@@ -701,14 +1010,13 @@ body.dark-mode .levee-row:hover {
         flex-wrap: wrap;
     }
 
-    .levees-title,
-    .levees-date {
+    .levees-title {
         width: 100%;
     }
 
-    .levees-date {
-        align-items: flex-start;
-        margin-top: 8px;
+    .levees-header-right {
+        width: 100%;
+        justify-content: space-between;
     }
 
     .levees-toolbar {
@@ -745,8 +1053,18 @@ body.dark-mode .levee-row:hover {
     }
 
     .levees-title strong {
-        font-size: 18px;
-        letter-spacing: 1px;
+        font-size: 26px;
+        letter-spacing: 0.1em;
+    }
+
+    .levees-header-right {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
+    }
+
+    .levees-date {
+        align-items: flex-start;
     }
 
     .levees-toolbar {
@@ -781,7 +1099,12 @@ body.dark-mode .levee-row:hover {
 
     .departure-banner {
         padding: 18px;
-        min-height: 100px;
+        min-height: 90px;
+    }
+
+    .departure-banner strong {
+        font-size: 19px;
+        letter-spacing: 0.12em;
     }
 
     .departure-number {
@@ -792,27 +1115,46 @@ body.dark-mode .levee-row:hover {
         flex-direction: column;
         align-items: flex-start;
         justify-content: center;
-        gap: 5px;
+        gap: 6px;
 
         padding: 15px 18px;
     }
 }
 
 /* =====================================================
-   LEVÉE TERMINÉE (ligne grisée)
+   LEVÉE TERMINÉE (comme un vol parti)
+   → on garde un texte lisible, seules les couleurs s'adoucissent
 ===================================================== */
 
 .levee-row.levee-terminee {
-    opacity: 0.55;
-    background: var(--lv-surface-soft);
+    background: rgba(255, 255, 255, 0.015);
+}
+
+.levee-row.levee-terminee .levee-date-cell strong,
+.levee-row.levee-terminee .levee-time-cell strong,
+.levee-row.levee-terminee .levee-code {
+    color: var(--bd-text);
+}
+
+.levee-row.levee-terminee .flap {
+    color: var(--bd-text);
+    background: linear-gradient(
+        180deg,
+        #2e2057 0%,
+        #221643 49.5%,
+        #0e0822 50.5%,
+        #180f33 100%
+    );
 }
 
 .levee-row.levee-terminee .levee-defunt strong {
-    color: #a10e0e;
+    color: #fda4af;
 }
 
-body.dark-mode .levee-row.levee-terminee .levee-defunt strong {
-    color: #fca5a5;
+.levee-row.levee-terminee .levee-chapelle-cell span {
+    background: #4b3a7d;
+    color: #e9ddff;
+    box-shadow: none;
 }
 
 /* =====================================================
@@ -820,8 +1162,8 @@ body.dark-mode .levee-row.levee-terminee .levee-defunt strong {
 ===================================================== */
 
 .levee-status.termine {
-    background: var(--lv-surface-soft);
-    color: #a10e0e;
+    background: rgba(251, 113, 133, 0.12);
+    color: var(--bd-red);
 }
 
 .levee-status.termine .status-dot {
@@ -829,5 +1171,19 @@ body.dark-mode .levee-row.levee-terminee .levee-defunt strong {
 }
 
 body.dark-mode .levee-status.termine {
-    color: #fca5a5;
+    color: var(--bd-red);
+}
+
+/* =====================================================
+   ACCESSIBILITÉ : pas d'animation si l'utilisateur la refuse
+===================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    .flap,
+    .levees-clock .flap-sep,
+    .levee-status.attente,
+    .status-dot,
+    .loading-icon {
+        animation: none !important;
+    }
 }

@@ -1,9 +1,100 @@
-
 import "./Navbar.css";
 import { useEffect, useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useSession } from "../services/SessionContext";
 import GlobalSearch from "./GlobalSearch";
+
+/* =========================================================
+   PETITES ICÔNES (traits fins, couleur = couleur du texte)
+========================================================= */
+
+const ICONES = {
+    dashboard: (
+        <>
+            <rect x="3" y="3" width="7" height="9" rx="1" />
+            <rect x="14" y="3" width="7" height="5" rx="1" />
+            <rect x="14" y="12" width="7" height="9" rx="1" />
+            <rect x="3" y="16" width="7" height="5" rx="1" />
+        </>
+    ),
+    depot: (
+        <>
+            <rect x="2" y="3" width="20" height="5" rx="1" />
+            <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+            <path d="M10 12h4" />
+        </>
+    ),
+    pin: (
+        <>
+            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+            <circle cx="12" cy="10" r="3" />
+        </>
+    ),
+    chart: (
+        <>
+            <path d="M3 3v18h18" />
+            <path d="M18 17V9" />
+            <path d="M13 17V5" />
+            <path d="M8 17v-3" />
+        </>
+    ),
+    move: (
+        <>
+            <path d="M8 3 4 7l4 4" />
+            <path d="M4 7h16" />
+            <path d="m16 21 4-4-4-4" />
+            <path d="M20 17H4" />
+        </>
+    ),
+    doc: (
+        <>
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+            <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+            <path d="M10 9H8" />
+            <path d="M16 13H8" />
+            <path d="M16 17H8" />
+        </>
+    ),
+    settings: (
+        <>
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+            <circle cx="12" cy="12" r="3" />
+        </>
+    ),
+    sun: (
+        <>
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2" />
+            <path d="M12 20v2" />
+            <path d="m4.93 4.93 1.41 1.41" />
+            <path d="m17.66 17.66 1.41 1.41" />
+            <path d="M2 12h2" />
+            <path d="M20 12h2" />
+            <path d="m6.34 17.66-1.41 1.41" />
+            <path d="m19.07 4.93-1.41 1.41" />
+        </>
+    ),
+    moon: <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />,
+};
+
+function Icon({ name, size = 17 }) {
+    return (
+        <svg
+            className="nav-icon"
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+        >
+            {ICONES[name]}
+        </svg>
+    );
+}
 
 function Navbar() {
     const [openMenu, setOpenMenu] = useState(null);
@@ -53,6 +144,11 @@ function Navbar() {
 
         return () => document.body.classList.remove("navbar-mobile-ouverte");
     }, [mobileOpen]);
+
+    /* ---------- APPLIQUER LE THÈME AU CHARGEMENT ---------- */
+    useEffect(() => {
+        document.body.classList.toggle("dark-mode", darkMode);
+    }, [darkMode]);
 
     /* ---------- MODE SOMBRE ---------- */
     const toggleDarkMode = () => {
@@ -130,6 +226,7 @@ function Navbar() {
         groupes.push({
             key: "mouvements",
             label: "Mouvements",
+            icone: "move",
             items: mouvements,
         });
     }
@@ -163,6 +260,7 @@ function Navbar() {
         groupes.push({
             key: "documents",
             label: "Documents",
+            icone: "doc",
             items: documents,
         });
     }
@@ -180,6 +278,12 @@ function Navbar() {
                 label: "Chapelles",
                 description: "Lieux de recueillement",
                 icon: "⛪",
+            },
+            {
+                to: "/Parametres?section=tarifs",
+                label: "Tarifs",
+                description: "Tarifs de conservation",
+                icon: "💵",
             },
             {
                 to: "/Parametres?section=prestations",
@@ -260,18 +364,21 @@ function Navbar() {
                 <div className="navbar-links">
                     {canDashboard && (
                         <NavLink to="/dashboard" className="nav-link">
+                            <Icon name="dashboard" />
                             <span>Tableau de bord</span>
                         </NavLink>
                     )}
 
                     {canDepot && (
                         <NavLink to="/DepotCorps" className="nav-link">
+                            <Icon name="depot" />
                             <span>Dépôts</span>
                         </NavLink>
                     )}
 
                     {canEmplacements && (
                         <NavLink to="/Emplacements" className="nav-link">
+                            <Icon name="pin" />
                             <span>Emplacements</span>
                         </NavLink>
                     )}
@@ -295,6 +402,7 @@ function Navbar() {
                                     aria-expanded={ouvert}
                                     aria-haspopup="true"
                                 >
+                                    <Icon name={groupe.icone} />
                                     <span>{groupe.label}</span>
                                     <span
                                         className={`navbar-chevron ${
@@ -339,6 +447,7 @@ function Navbar() {
 
                     {canStatistiques && (
                         <NavLink to="/Statistiques" className="nav-link">
+                            <Icon name="chart" />
                             <span>Statistiques</span>
                         </NavLink>
                     )}
@@ -371,7 +480,7 @@ function Navbar() {
                                     className="parametre-icon"
                                     aria-hidden="true"
                                 >
-                                    ⚙️
+                                    <Icon name="settings" size={20} />
                                 </span>
                             </button>
 
@@ -418,10 +527,13 @@ function Navbar() {
                         </div>
                     )}
 
-                    <div className="navbar-separator"></div>
-
+                   
                     {/* UTILISATEUR */}
                     <div className="navbar-user navbar-dropdown-wrapper">
+                        <span className="navbar-avatar" aria-hidden="true">
+                            {(user?.name || "U").charAt(0).toUpperCase()}
+                        </span>
+
                         <div className="user-info">
                             <strong>{user?.name || "Utilisateur"}</strong>
 
@@ -449,15 +561,35 @@ function Navbar() {
                         </button>
 
                         {openMenu === "utilisateur" && (
-                            <div className="admin-dropdown">
-                                <button type="button" onClick={toggleDarkMode}>
-                                    {darkMode
-                                        ? "☀️ Luminosité claire"
-                                        : "🌙 Mode sombre"}
+                            <div className="admin-dropdown user-account-dropdown">
+                                <button
+                                    type="button"
+                                    className="user-dropdown-theme"
+                                    onClick={toggleDarkMode}
+                                    aria-label={
+                                        darkMode
+                                            ? "Activer le mode clair"
+                                            : "Activer le mode sombre"
+                                    }
+                                >
+                                    <Icon
+                                        name={darkMode ? "sun" : "moon"}
+                                        size={17}
+                                    />
+                                    <span>
+                                        {darkMode ? "Mode clair" : "Mode sombre"}
+                                    </span>
                                 </button>
 
-                                <button type="button" onClick={handleLogout}>
-                                    🔒 Déconnexion
+                                <div className="user-dropdown-separator"></div>
+
+                                <button
+                                    type="button"
+                                    className="user-dropdown-logout"
+                                    onClick={handleLogout}
+                                >
+                                    <span aria-hidden="true">↪</span>
+                                    <span>Déconnexion</span>
                                 </button>
                             </div>
                         )}
@@ -670,9 +802,18 @@ function Navbar() {
                         </nav>
 
                         <div className="navbar-mobile-actions">
-                            <button type="button" onClick={toggleDarkMode}>
-                                {darkMode ? "☀️ Mode clair" : "🌙 Mode sombre"}
+                            <button
+                                type="button"
+                                className="navbar-theme-btn"
+                                onClick={toggleDarkMode}
+                                title={darkMode ? "Mode clair" : "Mode sombre"}
+                                aria-label={darkMode ? "Mode clair" : "Mode sombre"}
+                            >
+                                <Icon name={darkMode ? "sun" : "moon"} size={18} />
+                                <span>{darkMode ? "Mode clair" : "Mode sombre"}</span>
                             </button>
+
+                            <div className="navbar-separator"></div>
 
                             <button
                                 type="button"

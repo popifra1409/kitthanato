@@ -278,9 +278,7 @@ function GlobalSearch({ variante = "desktop", onNaviguer }) {
             ref={conteneur}
         >
             <div className={`recherche-champ ${panneauVisible ? "ouvert" : ""}`}>
-                <span className="recherche-icone" aria-hidden="true">
-                    🔍
-                </span>
+                
 
                 <input
                     ref={champ}

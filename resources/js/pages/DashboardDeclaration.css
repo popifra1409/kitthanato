@@ -544,3 +544,47 @@
         page-break-after: auto;
     }
 }
+
+
+
+.declaration-print-container {
+    position: fixed;
+    top: 0;
+    left: -10000px;     /* hors du viewport, mais bien rendu */
+    width: 210mm;
+    z-index: -1;
+    pointer-events: none;
+    background: #fff;
+}
+
+/* Quand on imprime, on ramène le contenu au premier plan */
+body.printing-declaration .declaration-print-container {
+    position: static  ;
+    left: 0  ;
+    width: 100%  ;
+    pointer-events: auto;
+    z-index: auto;
+}
+
+@media print {
+    /* Toutes les autres parties de l'app (dashboard, header, etc.)
+       sont masquées pendant l'impression de la déclaration */
+    body.printing-declaration > *:not(.declaration-print-container) {
+        display: none  ;
+    }
+
+    body.printing-declaration .declaration-print-container {
+        position: static  ;
+        left: 0  ;
+        width: 100%  ;
+        display: block  ;
+    }
+
+    body.printing-declaration .declaration-print-container .decl-page {
+        page-break-after: always;
+    }
+
+    body.printing-declaration .declaration-print-container .decl-page:last-child {
+        page-break-after: auto;
+    }
+}

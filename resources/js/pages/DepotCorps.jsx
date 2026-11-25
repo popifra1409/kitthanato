@@ -1061,206 +1061,164 @@ function DepotCorps() {
 
     /* =====================================================
        ENREGISTRER
-       ⚠ On n'envoie PAS code_defunt : le backend le génère.
+       
     ===================================================== */
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+    e.preventDefault();
 
-        if (enregistrement) return;
+    if (enregistrement) return;
 
-        if (currentStep < ETAPES.length) {
-            etapeSuivante();
-            return;
-        }
-
-        for (let s = 1; s < ETAPES.length; s++) {
-            if (!validerEtape(s)) {
-                setCurrentStep(s);
-                return;
-            }
-        }
-
-        let listeFinale = [...deposants];
-
-        const lienParenteCourant = lienAutreActif
-            ? lienAutre.trim()
-            : deposantCourant.lien_parente;
-
-        if (deposantCourant.nom.trim() && lienAutreActif && !lienParenteCourant) {
-            showNotif(
-                "error",
-                "Champ manquant",
-                "Veuillez préciser le lien de parenté."
-            );
-            return;
-        }
-
-        if (deposantCourant.nom.trim()) {
-            if (lienAutreActif) memoriserLienParente(lienParenteCourant);
-
-            listeFinale.push({
-                ...deposantCourant,
-                nom: deposantCourant.nom.trim(),
-                lien_parente: lienParenteCourant,
-                statut:
-                    listeFinale.length === 0 ? "principal" : "secondaire",
-            });
-        }
-
-        if (listeFinale.length === 0) {
-            showNotif(
-                "error",
-                "Champ manquant",
-                "Veuillez ajouter au moins un déposant."
-            );
-            return;
-        }
-
-        if (!listeFinale.some((d) => d.statut === "principal")) {
-            listeFinale[0] = { ...listeFinale[0], statut: "principal" };
-        }
-
-        const principal = listeFinale.find(
-            (d) => d.statut === "principal"
-        );
-
-        if (!principal.cni || !principal.cni.trim()) {
-            showNotif(
-                "error",
-                "Champ manquant",
-                "Le CNI du déposant principal est obligatoire."
-            );
-            return;
-        }
-
-        try {
-            setEnregistrement(true);
-
-            const donnees = {
-                ...formData,
-
-                /* code conservé au format 26PA00015 */
-                code: `${PREFIXE_ANNEE}${formData.code}`,
-
-                /* ❌ PAS de code_defunt dans le payload :
-                   le backend le génère à la création
-                   et le conserve à la modification. */
-
-                /* Caisson choisi → le backend en dérive l'emplacement. */
-                caisson_id: formData.caisson_id
-                    ? Number(formData.caisson_id)
-                    : null,
-                emplacement: caissonSelectionne
-                    ? emplacementCalcule
-                    : formData.emplacement || "",
-
-                motif: formData.motif || "Non précisé",
-                etat: formData.etat || "Non précisé",
-                chapelle: formData.chapelle || "Aucune",
-                age: formData.age ? Number(formData.age) : null,
-
-                date_naissance: formData.date_naissance || null,
-                date_deces: formData.date_deces || null,
-                heure_deces: formData.heure_deces || null,
-                date_arrivee: formData.date_arrivee || null,
-                heure_arrivee: formData.heure_arrivee || null,
-                date_sortie: formData.date_sortie || null,
-
-                service_origine:
-                    formData.provenance === "Interne"
-                        ? formData.service_origine
-                        : null,
-                lieu_provenance:
-                    formData.provenance === "Externe"
-                        ? formData.lieu_provenance
-                        : null,
-
-                prestations: prestationsSelectionnees,
-                montant_prestations: montantPrestations,
-
-                depositants: listeFinale,
-
-                contact_nom: principal.nom,
-                contact_telephone: principal.telephone,
-                contact_cni: principal.cni,
-                lien_parente: principal.lien_parente,
-            };
-
-            if (editingId) {
-                await api.depots.update(editingId, donnees);
-            } else {
-                await api.depots.create(donnees);
-            }
-
-            showNotif(
-                "success",
-                editingId ? "Dépôt modifié" : "Dépôt enregistré",
-                editingId
-                    ? "Les modifications ont été enregistrées avec succès."
-                    : "Le dépôt a été enregistré avec succès."
-            );
-
-            closeForm();
-            await fetchDepots();
-            chargerEmplacements();
-        } catch (error) {
-            console.error(error);
-            showNotif(
-                "error",
-                "Échec",
-                error.firstMessage ||
-                    error.message ||
-                    "Impossible d'enregistrer le dépôt."
-            );
-        } finally {
-            setEnregistrement(false);
-        }
-
-      const etatSaisi = (formData.etat || "").trim();
-
-let etatId = null;
-
-if (etatSaisi) {
-    try {
-        // Vérifier si l'état existe déjà
-        let etatExistant = etats.find(
-            (e) =>
-                e.nom.trim().toLowerCase() ===
-                etatSaisi.toLowerCase()
-        );
-
-        // Créer l'état s'il n'existe pas
-        if (!etatExistant) {
-            const resultat = await api.etats.create(etatSaisi);
-
-            etatExistant = resultat.etat || resultat;
-
-            setEtats((prev) => {
-                const existe = prev.some(
-                    (e) => e.id === etatExistant.id
-                );
-
-                return existe ? prev : [...prev, etatExistant];
-            });
-        }
-
-        etatId = etatExistant.id;
-
-    } catch (err) {
-        console.error("Erreur lors de la gestion de l'état :", err);
-
-        showNotif(
-            "error",
-            "Erreur",
-            err.firstMessage || "Impossible d'enregistrer l'état."
-        );
-
+    if (currentStep < ETAPES.length) {
+        etapeSuivante();
         return;
     }
-}
-    };
 
+    for (let s = 1; s < ETAPES.length; s++) {
+        if (!validerEtape(s)) {
+            setCurrentStep(s);
+            return;
+        }
+    }
+
+    let listeFinale = [...deposants];
+
+    const lienParenteCourant = lienAutreActif
+        ? lienAutre.trim()
+        : deposantCourant.lien_parente;
+
+    if (deposantCourant.nom.trim() && lienAutreActif && !lienParenteCourant) {
+        showNotif(
+            "error",
+            "Champ manquant",
+            "Veuillez préciser le lien de parenté."
+        );
+        return;
+    }
+
+    if (deposantCourant.nom.trim()) {
+        if (lienAutreActif) memoriserLienParente(lienParenteCourant);
+
+        listeFinale.push({
+            ...deposantCourant,
+            nom: deposantCourant.nom.trim(),
+            lien_parente: lienParenteCourant,
+            statut: listeFinale.length === 0 ? "principal" : "secondaire",
+        });
+    }
+
+    if (listeFinale.length === 0) {
+        showNotif(
+            "error",
+            "Champ manquant",
+            "Veuillez ajouter au moins un déposant."
+        );
+        return;
+    }
+
+    if (!listeFinale.some((d) => d.statut === "principal")) {
+        listeFinale[0] = { ...listeFinale[0], statut: "principal" };
+    }
+
+    const principal = listeFinale.find((d) => d.statut === "principal");
+
+    if (!principal.cni || !principal.cni.trim()) {
+        showNotif(
+            "error",
+            "Champ manquant",
+            "Le CNI du déposant principal est obligatoire."
+        );
+        return;
+    }
+
+    try {
+        setEnregistrement(true);
+
+        const donnees = {
+            ...formData,
+
+            /* code conservé au format 26PA00015 */
+            code: `${PREFIXE_ANNEE}${formData.code}`,
+
+            /* ❌ PAS de code_defunt dans le payload :
+               le backend le génère à la création
+               et le conserve à la modification. */
+
+            /* Caisson choisi → le backend en dérive l'emplacement. */
+            caisson_id: formData.caisson_id
+                ? Number(formData.caisson_id)
+                : null,
+            emplacement: caissonSelectionne
+                ? emplacementCalcule
+                : formData.emplacement || "",
+
+            motif: formData.motif || "Non précisé",
+            etat: formData.etat || "Non précisé",
+            chapelle: formData.chapelle || "Aucune",
+            age: formData.age ? Number(formData.age) : null,
+
+            date_naissance: formData.date_naissance || null,
+            date_deces: formData.date_deces || null,
+            heure_deces: formData.heure_deces || null,
+            date_arrivee: formData.date_arrivee || null,
+            heure_arrivee: formData.heure_arrivee || null,
+            date_sortie: formData.date_sortie || null,
+
+            service_origine:
+                formData.provenance === "Interne"
+                    ? formData.service_origine
+                    : null,
+            lieu_provenance:
+                formData.provenance === "Externe"
+                    ? formData.lieu_provenance
+                    : null,
+
+            prestations: Array.isArray(prestationsSelectionnees)
+                ? prestationsSelectionnees
+                : [],
+            montant_prestations: montantPrestations,
+
+            depositants: Array.isArray(listeFinale) ? listeFinale : [],
+
+            contact_nom: principal.nom,
+            contact_telephone: principal.telephone,
+            contact_cni: principal.cni,
+            lien_parente: principal.lien_parente,
+        };
+
+        /* On ne transmet pas code_defunt (le backend le gère). */
+        delete donnees.code_defunt;
+
+        if (editingId) {
+            await api.depots.update(editingId, donnees);
+        } else {
+            await api.depots.create(donnees);
+        }
+
+        showNotif(
+            "success",
+            editingId ? "Dépôt modifié" : "Dépôt enregistré",
+            editingId
+                ? "Les modifications ont été enregistrées avec succès."
+                : "Le dépôt a été enregistré avec succès."
+        );
+
+        closeForm();
+        await fetchDepots();
+        chargerEmplacements();
+    } catch (error) {
+        console.error(error);
+        showNotif(
+            "error",
+            "Échec",
+            error.firstMessage ||
+                error.message ||
+                "Impossible d'enregistrer le dépôt."
+        );
+    } finally {
+        setEnregistrement(false);
+    }
+};
     /* =====================================================
        BOX
     ===================================================== */

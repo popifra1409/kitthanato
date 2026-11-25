@@ -7,7 +7,6 @@ use Illuminate\Http\Request;
 
 class EtatController extends Controller
 {
-    // Récupérer les professions
     public function index(Request $request)
     {
         $recherche = $request->query('recherche');
@@ -22,7 +21,6 @@ class EtatController extends Controller
         return response()->json($etats);
     }
 
-    
     public function store(Request $request)
     {
         $request->validate([

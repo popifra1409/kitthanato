@@ -1318,44 +1318,23 @@ function Emplacements() {
                                                     <option value="">
                                                         Choisir un caisson…
                                                     </option>
-                                                    {caissonsDisponibles.map(
-                                                        (chambreDispo) => (
-                                                            <optgroup
-                                                                key={
-                                                                    chambreDispo.id
-                                                                }
-                                                                label={
-                                                                    chambreDispo.nom
-                                                                }
-                                                            >
-                                                                {chambreDispo.caissons.map(
-                                                                    (caissonDispo) => (
-                                                                        <option
-                                                                            key={
-                                                                                caissonDispo.id
-                                                                            }
-                                                                            value={
-                                                                                caissonDispo.id
-                                                                            }
-                                                                            disabled={
-                                                                                !caissonDispo.disponible &&
-                                                                                caissonDispo.id !==
-                                                                                    corps.caisson_id
-                                                                            }
-                                                                        >
-                                                                            {
-                                                                                caissonDispo.code
-                                                                            }
-                                                                            {caissonDispo.occupants >
-                                                                            0
-                                                                                ? ` — ${caissonDispo.occupants} corps`
-                                                                                : " — libre"}
-                                                                        </option>
-                                                                    )
-                                                                )}
-                                                            </optgroup>
-                                                        )
-                                                    )}
+                                                    {caissonsDisponibles.map((chambreDispo) => (
+    <optgroup key={chambreDispo.id} label={chambreDispo.nom}>
+        {(chambreDispo.caissons || []).map((caissonDispo) => (
+            <option
+                key={caissonDispo.id}
+                value={caissonDispo.id}
+                /* ✅ On n'utilise plus `disponible` : un caisson
+                      peut toujours être attribué, même déjà occupé. */
+            >
+                {caissonDispo.code}
+                {caissonDispo.occupants > 0
+                    ? ` — ${caissonDispo.occupants} corps`
+                    : " — libre"}
+            </option>
+        ))}
+    </optgroup>
+))}
                                                 </select>
 
                                                 <button

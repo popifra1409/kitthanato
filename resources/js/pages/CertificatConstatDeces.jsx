@@ -301,7 +301,7 @@ export default function CertificatConstatDeces() {
 
             const response = await api.constats.getByDepot(depotId);
 
-const existant = response.constat;
+            const existant = response.constat;
 
             if (!existant) return;
 
@@ -347,20 +347,20 @@ const existant = response.constat;
     };
 
     /* =====================================================
-       ENREGISTRER
+       ✅ ENREGISTRER — retourne true si succès, false sinon
     ===================================================== */
     const enregistrer = async () => {
         if (!d.depot_id) {
             afficherMessage("error", "Veuillez sélectionner un défunt.");
-            return;
+            return false;
         }
         if (!d.praticien.trim()) {
             afficherMessage("error", "Veuillez saisir le nom du praticien.");
-            return;
+            return false;
         }
         if (!d.dateDeces) {
             afficherMessage("error", "La date de décès est obligatoire.");
-            return;
+            return false;
         }
 
         const heureConstat =
@@ -413,6 +413,7 @@ const existant = response.constat;
                     `Constat de ${d.nomComplet} enregistré.`
                 );
             }
+            return true;
         } catch (e) {
             console.error("[Constat] enregistrement :", e);
 
@@ -423,7 +424,7 @@ const existant = response.constat;
                     "error",
                     `Un constat existe déjà pour ce défunt. Formulaire passé en mode modification.`
                 );
-                return;
+                return false;
             }
 
             afficherMessage(
@@ -432,6 +433,7 @@ const existant = response.constat;
                     e.message ||
                     "Impossible d'enregistrer le constat."
             );
+            return false;
         }
     };
 
@@ -446,24 +448,26 @@ const existant = response.constat;
         }
     };
 
- const imprimer = async () => {
-    const feuille = document.querySelector(".sheet");
+    /* =====================================================
+       IMPRESSION (utilisée APRÈS un enregistrement réussi)
+    ===================================================== */
+    const lancerImpression = async () => {
+        const feuille = document.querySelector(".sheet");
 
-    if (!feuille) {
-        afficherMessage("error", "Feuille introuvable.");
-        return;
-    }
+        if (!feuille) {
+            afficherMessage("error", "Feuille introuvable.");
+            return;
+        }
 
-    /* Copie de la feuille avec les valeurs saisies */
-    const copie = feuille.cloneNode(true);
-    const champs = feuille.querySelectorAll("input");
+        const copie = feuille.cloneNode(true);
+        const champs = feuille.querySelectorAll("input");
 
-    copie.querySelectorAll("input").forEach((champ, i) => {
-        champ.setAttribute("value", champs[i]?.value ?? "");
-        champ.removeAttribute("placeholder");
-    });
+        copie.querySelectorAll("input").forEach((champ, i) => {
+            champ.setAttribute("value", champs[i]?.value ?? "");
+            champ.removeAttribute("placeholder");
+        });
 
-    const html = `<!DOCTYPE html>
+        const html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="utf-8" />
@@ -490,7 +494,6 @@ const existant = response.constat;
   }
   .f-input, .f-input:focus { background: transparent !important; }
 
-  /* Même mise en page qu'à l'écran */
   @media print {
     .sheet > * { margin-top: var(--decalage-y) !important; }
     .sheet > .title, .sheet > .sign { margin-top: 55px !important; }
@@ -502,43 +505,53 @@ const existant = response.constat;
 </body>
 </html>`;
 
-    const iframe = document.createElement("iframe");
-    iframe.title = "Impression du certificat";
-    iframe.style.cssText =
-        "position:fixed;right:0;bottom:0;width:210mm;height:297mm;border:0;opacity:0;pointer-events:none;";
-    document.body.appendChild(iframe);
+        const iframe = document.createElement("iframe");
+        iframe.title = "Impression du certificat";
+        iframe.style.cssText =
+            "position:fixed;right:0;bottom:0;width:210mm;height:297mm;border:0;opacity:0;pointer-events:none;";
+        document.body.appendChild(iframe);
 
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(html);
-    doc.close();
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
 
-    const nettoyer = () => {
-        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        const nettoyer = () => {
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        };
+
+        iframe.contentWindow.onafterprint = nettoyer;
+        setTimeout(nettoyer, 60000);
+
+        const images = Array.from(doc.images).map((img) =>
+            img.complete
+                ? Promise.resolve()
+                : new Promise((resolve) => {
+                      img.onload = resolve;
+                      img.onerror = resolve;
+                  })
+        );
+
+        await Promise.race([
+            Promise.all(images),
+            new Promise((resolve) => setTimeout(resolve, 3000)),
+        ]);
+        await new Promise((resolve) => setTimeout(resolve, 150));
+
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
     };
 
-    iframe.contentWindow.onafterprint = nettoyer;
-    setTimeout(nettoyer, 60000);
+    /* =====================================================
+       ✅ IMPRIMER — enregistre d'abord, imprime ensuite
+    ===================================================== */
+    const imprimer = async () => {
+        const ok = await enregistrer();
+        if (!ok) return;
 
-    /* Attendre le logo (3 s maximum) puis l'application des styles */
-    const images = Array.from(doc.images).map((img) =>
-        img.complete
-            ? Promise.resolve()
-            : new Promise((resolve) => {
-                  img.onload = resolve;
-                  img.onerror = resolve;
-              })
-    );
+        await lancerImpression();
+    };
 
-    await Promise.race([
-        Promise.all(images),
-        new Promise((resolve) => setTimeout(resolve, 3000)),
-    ]);
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-};
     /* =====================================================
        COMPOSANTS D'IMPRESSION
     ===================================================== */
@@ -676,10 +689,10 @@ const existant = response.constat;
             <main className="sheet">
                 {head(LEFT_HEAD, 11)}
                 <img
-    className="constat-logo"
-    src="/logo.png"
-    alt="Logo de l'hôpital"
-/>
+                    className="constat-logo"
+                    src="/logo.png"
+                    alt="Logo de l'hôpital"
+                />
                 {head(RIGHT_HEAD, 153)}
 
                 {T("N/Ref :", 25.6, 49)}

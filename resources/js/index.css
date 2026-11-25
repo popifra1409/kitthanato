@@ -324,3 +324,21 @@ button:disabled {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
 }
+/* ARRIÈRE-PLAN GLOBAL DE THANATO */
+body {
+    background: #f5f1fc;
+    margin: 0;
+    min-height: 100vh;
+}
+
+#root {
+    min-height: 100vh;
+    background: #f5f1fc;
+}
+
+/* Fond des pages */
+main,
+.page-container,
+.content-container {
+    background-color: #f5f1fc;
+}

@@ -110,6 +110,11 @@ export const prestations = {
     listAdmin: () => get("/prestations-admin"),
 };
 
+export const tarifs = {
+   list: () => get("/tarifs-conservation"),
+    update: (id, prix) => put(`/tarifs-conservation/${id}`, { prix }),
+};
+
 export const chapelles = {
     ...ressource("chapelles"),
     listAdmin: () => get("/chapelles-admin"),
@@ -140,8 +145,14 @@ export const emplacements = {
         create: (donnees) => post("/chambres-froides", donnees),
         update: (id, donnees) => put(`/chambres-froides/${id}`, donnees),
         toggleActif: (id) => put(`/chambres-froides/${id}/actif`, {}),
-        ajouterCaisson: (id, code) =>
-            post(`/chambres-froides/${id}/caissons`, { code }),
+        ajouterCaisson: (id, code) => {
+            // ✅ n'envoie `code` que s'il est renseigné (sinon backend auto)
+            const corps =
+                code && String(code).trim()
+                    ? { code: String(code).trim() }
+                    : {};
+            return post(`/chambres-froides/${id}/caissons`, corps);
+        },
     },
     caissons: {
         update: (id, donnees) => put(`/caissons/${id}`, donnees),
@@ -187,6 +198,7 @@ const api = {
     chapelles,
     professions,
     etats,
+    tarifs,
     services,
     emplacements,
     utilisateurs,

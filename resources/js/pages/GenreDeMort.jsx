@@ -37,7 +37,6 @@ const heureHm = (v) => (v ? String(v).substring(0, 5) : "");
 /* =========================================================
    CONSTANTES
    x = position gauche du libellé (mm), y = centre de la ligne (mm)
-   La case se place automatiquement juste APRÈS le libellé.
 ========================================================= */
 const GENRES_GAUCHE = [
     { key: "naturelle", label: "Mort naturelle (maladie)", x: 68.5, y: 161.3 },
@@ -359,14 +358,14 @@ function GenreDeMort() {
     };
 
     /* =====================================================
-       ENREGISTRER
+       ✅ ENREGISTRER — retourne true si succès, false sinon
     ===================================================== */
     const enregistrerCertificat = async (e) => {
         if (e) e.preventDefault();
 
         if (!defuntActif?.id) {
             afficherMessage("error", "Veuillez sélectionner un défunt.");
-            return;
+            return false;
         }
 
         try {
@@ -405,12 +404,14 @@ function GenreDeMort() {
                     "Certificat enregistré avec succès."
                 );
             }
+            return true;
         } catch (error) {
             console.error(error);
             afficherMessage(
                 "error",
                 error.message || "Impossible d'enregistrer le certificat."
             );
+            return false;
         } finally {
             setEnregistrement(false);
         }
@@ -424,7 +425,13 @@ function GenreDeMort() {
         else navigate("/");
     };
 
-    const imprimer = () => {
+    /* =====================================================
+       ✅ IMPRIMER — enregistre d'abord, imprime ensuite
+    ===================================================== */
+    const imprimer = async () => {
+        const ok = await enregistrerCertificat();
+        if (!ok) return;
+
         window.requestAnimationFrame(() => {
             window.print();
         });
@@ -432,11 +439,7 @@ function GenreDeMort() {
 
     /* =====================================================
        COMPOSANTS D'IMPRESSION
-       Toutes les coordonnées du corps sont en mm :
-       x = bord gauche, y = CENTRE vertical de la ligne.
     ===================================================== */
-
-    // Texte imprimé
     const T = (text, x, y, cls = "") => (
         <span
             className={`t ${cls}`}
@@ -446,7 +449,6 @@ function GenreDeMort() {
         </span>
     );
 
-    // Champ de saisie (ligne pointillée)
     const I = (k, x, w, y, cls = "") => (
         <input
             className={`f-input ${cls}`}
@@ -461,7 +463,6 @@ function GenreDeMort() {
         />
     );
 
-    // Libellé + case à cocher JUSTE APRÈS le libellé (comme sur le papier)
     const LB = (label, checked, onClick, x, y, cls = "") => (
         <span
             className={`lb ${cls}`}
@@ -480,7 +481,6 @@ function GenreDeMort() {
         </span>
     );
 
-    // Choix unique (Masculin/Féminin, OUI/NON/Inconnu)
     const B = (k, v, label, x, y, cls = "") =>
         LB(
             label,
@@ -491,7 +491,6 @@ function GenreDeMort() {
             cls
         );
 
-    // Genre de mort (cases multiples)
     const G = (g) =>
         LB(g.label, !!genres[g.key], () => toggleGenre(g.key), g.x, g.y, "sm");
 
@@ -557,7 +556,6 @@ function GenreDeMort() {
 
             {/* FEUILLE A4 */}
             <main className="sheet">
-                {/* ---------- EN-TÊTE (inchangé) ---------- */}
                 {head(LEFT_HEAD, 11)}
                 <img
                     className="gm-header__emblem"
@@ -566,46 +564,37 @@ function GenreDeMort() {
                 />
                 {head(RIGHT_HEAD, 153)}
 
-                {/* ---------- N/Ref (inchangé) ---------- */}
                 {T("N/Ref :", 25.6, 52.6)}
                 {I("ref", 40, 32, 52.6)}
                 {T("/HGY/DMR/CD", 73, 52.6)}
 
-                {/* ---------- Yaoundé le (à droite) ---------- */}
                 {T("Yaoundé le", 139.3, 55)}
                 {I("yaounde", 160.5, 26, 55)}
                 {T("Yaounde the", 139.5, 59.4, "en")}
 
-                {/* ---------- Titre ---------- */}
                 <h1 className="title" style={{ top: `${70.7 - 3.5}mm` }}>
                     CERTIFICAT DE GENRE DE MORT
                 </h1>
 
-                {/* ---------- Je soussigné ---------- */}
                 {T("Je soussigné", 25.6, 84.9)}
                 {I("soussigne", 57, 134, 84.9)}
                 {T("I, the Undersigned", 27, 89.3, "en")}
 
-                {/* ---------- Sur la base du constat (champ à droite du libellé) ---------- */}
                 {T("Sur la base du Constat de décès établi par", 25.6, 98.7)}
                 {I("constat", 109.5, 83, 98.7)}
                 {T("Based on the death confirmed by", 32, 103.1, "en")}
 
-                {/* ---------- Le/on (à droite) ---------- */}
                 {T("Le/on", 91.5, 107.2)}
                 {I("leOn", 102, 90, 107.2)}
 
-                {/* ---------- Atteste que ---------- */}
                 {T("Atteste que :", 25.6, 111.8)}
                 {I("atteste", 49, 144, 112.3)}
                 {T("Affirms that", 25.6, 116, "en")}
 
-                {/* ---------- Sexe : Masculin □ ........ Féminin □ ---------- */}
                 {T("Sexe/Sex :", 25.6, 125.5, "bold")}
                 {B("sexe", "M", "Masculin", 52.9, 125.5)}
                 {B("sexe", "F", "Féminin", 115.6, 125.5)}
 
-                {/* ---------- Né(e) le ... est décédé le ... A ... ---------- */}
                 {T("Né(e) le :", 25.6, 133)}
                 {I("nele", 45, 27, 132)}
                 {T("Born on", 25.6, 138.6, "en")}
@@ -619,34 +608,27 @@ function GenreDeMort() {
                 {T("heure(s)", 146.8, 133)}
                 {I("minutes", 164, 10, 133)}
                 {T("minute(s)", 173, 133)}
-                
 
-                {/* ---------- Lieu du décès + heure(s) / minute(s) ---------- */}
                 {T("Lieu du décès :", 25.6, 145.4)}
                 {I("lieu", 54, 140, 145.4)}
                 {T("Place of death", 25.6, 149.6, "en")}
 
-                {/* ---------- Genre de mort ---------- */}
                 {T("Genre de mort :", 25.6, 158.2)}
                 {T("Cause of death", 25.6, 162.2, "en")}
 
-                {/* Colonne gauche : libellé puis case */}
                 {GENRES_GAUCHE.map((g) => (
                     <React.Fragment key={g.key}>{G(g)}</React.Fragment>
                 ))}
 
-                {/* Colonne droite : libellé puis case */}
                 {GENRES_DROITE.map((g) => (
                     <React.Fragment key={g.key}>{G(g)}</React.Fragment>
                 ))}
 
-                {/* Autres : ______ puis ______ (à préciser) */}
                 {T("Autres :", 129, 185.2, "sm")}
                 {I("autres", 141.5, 38, 185.2)}
                 {I("autresPrecision", 130, 39, 192.3)}
                 {T("(à préciser)", 170.5, 191, "sm")}
 
-                {/* ---------- Contagiosité ---------- */}
                 {T(
                     "La dépouille présente-t-elle un risque de contagiosité particulier ?",
                     25.6,
@@ -663,14 +645,12 @@ function GenreDeMort() {
                 {B("contagion", "non", "NON", 80.9, 216, "lg")}
                 {B("contagion", "inconnu", "Inconnu", 129.5, 216, "sm")}
 
-                {/* ---------- Autopsie ---------- */}
                 {T("Une autopsie a-t-elle été réalisée ?", 25.6, 226.6, "q")}
                 {T("Was an autopsy performed ?", 25.6, 232.5, "en")}
                 {B("autopsie", "oui", "OUI", 24.5, 242, "lg")}
                 {B("autopsie", "non", "NON", 80.9, 242, "lg")}
                 {B("autopsie", "inconnu", "Inconnu", 129.5, 242, "sm")}
 
-                {/* ---------- Fait à ... Le ... Heure ... ---------- */}
                 {T("Fait à", 67.3, 254.5, "bold")}
                 {I("faitA", 80.5, 33, 254)}
                 {T("Le", 115.5, 254.5, "bold")}
@@ -678,7 +658,6 @@ function GenreDeMort() {
                 {T("Heure", 149.3, 254.5, "bold")}
                 {I("faitHeure", 162.5, 24, 254)}
 
-                {/* ---------- Signature ---------- */}
                 <strong className="sign" style={{ top: `${261 - 3}mm` }}>
                     Signature et Cachet du Praticien
                 </strong>
@@ -704,7 +683,7 @@ function GenreDeMort() {
                     type="button"
                     className="btn-secondary"
                     onClick={imprimer}
-                    disabled={!defuntActif}
+                    disabled={!defuntActif || enregistrement}
                 >
                     🖨 Imprimer / PDF
                 </button>

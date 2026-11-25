@@ -109,6 +109,8 @@ const getTarifConservation = (emplacement) => {
 const DUREES_LEVEE = [
     { value: 10, label: "10 minutes" },
     { value: 15, label: "15 minutes" },
+    { value: 20, label: "20 minutes" },
+    { value: 25, label: "25 minutes" },
     { value: 30, label: "30 minutes" },
     { value: 45, label: "45 minutes" },
     { value: 60, label: "1 heure" },
@@ -213,6 +215,8 @@ export default function Sortie() {
     const [depots, setDepots] = useState([]);
     const [chapelles, setChapelles] = useState([]);
     const [prestations, setPrestations] = useState([]);
+
+    const [tarifs, setTarifs] = useState([]);
 
     const [chargement, setChargement] = useState(true);
 
@@ -455,6 +459,15 @@ export default function Sortie() {
         }
     };
 
+    const chargerTarifs = async () => {
+    try {
+        setTarifs(asList(await api.tarifs.list(), "tarifs"));
+    } catch (error) {
+        console.error("Erreur chargement tarifs :", error);
+    }
+};
+
+
     const chargerDonnees = async () => {
         setChargement(true);
         await Promise.all([
@@ -462,6 +475,8 @@ export default function Sortie() {
             chargerDepots(),
             chargerChapelles(),
             chargerPrestations(),
+            chargerTarifs(), 
+    
         ]);
         setChargement(false);
     };
@@ -556,9 +571,33 @@ export default function Sortie() {
     }, [depotSelectionne, form.date]);
 
     const tarifConservation = useMemo(() => {
-        if (!depotSelectionne) return 0;
+    if (!depotSelectionne) return 0;
+
+    // 1) On remonte à la chambre via le caisson
+    let nomChambre = depotSelectionne.caisson?.chambre_froide?.nom;
+
+    // 2) Sinon on extrait depuis "Chambre A · C-01"
+    if (!nomChambre && depotSelectionne.emplacement) {
+        nomChambre = String(depotSelectionne.emplacement)
+            .split("·")[0]
+            .trim();
+    }
+
+    if (!nomChambre) {
         return getTarifConservation(depotSelectionne.emplacement);
-    }, [depotSelectionne]);
+    }
+
+    const cible = nomChambre.toLowerCase();
+
+    const tarif = tarifs.find(
+        (t) => String(t.emplacement).trim().toLowerCase() === cible
+    );
+
+    return tarif
+        ? nombre(tarif.prix)
+        : getTarifConservation(depotSelectionne.emplacement);
+}, [depotSelectionne, tarifs]);
+
 
     const montantConservation = useMemo(
         () => nombreNuits * tarifConservation,
@@ -809,15 +848,6 @@ export default function Sortie() {
     const handleDateChange = (event) => {
         const nouvelleDate = event.target.value;
 
-        if (nouvelleDate && nouvelleDate < getToday()) {
-            showNotif(
-                "error",
-                "Date invalide",
-                "La date de sortie ne peut pas être antérieure à aujourd'hui."
-            );
-            return;
-        }
-
         setForm((ancien) => ({ ...ancien, date: nouvelleDate }));
     };
 
@@ -877,15 +907,6 @@ export default function Sortie() {
                 "error",
                 "Champ manquant",
                 "Veuillez saisir le nom du récupérateur."
-            );
-            return;
-        }
-
-        if (form.date < getToday()) {
-            showNotif(
-                "error",
-                "Date invalide",
-                "La date de sortie ne peut pas être antérieure à aujourd'hui."
             );
             return;
         }
@@ -1861,7 +1882,6 @@ export default function Sortie() {
                                             type="date"
                                             name="date"
                                             value={form.date}
-                                            min={getToday()}
                                             onChange={handleDateChange}
                                             required
                                         />

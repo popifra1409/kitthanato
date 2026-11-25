@@ -440,31 +440,63 @@ export default function DashboardDeclaration() {
         resetKey: `${recherche}::${filtreStatut}`,
     });
 
-    /* =====================================================
-       IMPRESSION → utilise DeclarationDeces
-    ===================================================== */
-
-    const imprimer = (declaration) => {
+  
+/* =====================================================
+   IMPRESSION — pilote le portail + classe body
+===================================================== */
+const imprimer = (declaration) => {
     setDeclarationAImprimer(declaration);
 };
 
-/* Lance l'impression une fois la déclaration rendue */
 useEffect(() => {
     if (!declarationAImprimer) return;
 
-    const fin = () => setDeclarationAImprimer(null);
+    /* Ajoute la classe qui active le mode impression */
+    document.body.classList.add("printing-declaration");
+
+    /* On laisse 2 frames pour que le navigateur peigne le portail
+       (avec position:fixed; left:-10000px, il est bien rendu). */
+    let raf1;
+    let raf2;
+    let timer;
+
+    raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => {
+            timer = setTimeout(() => {
+                window.print();
+            }, 100);
+        });
+    });
+
+    const fin = () => {
+        document.body.classList.remove("printing-declaration");
+        setDeclarationAImprimer(null);
+    };
+
     window.addEventListener("afterprint", fin);
 
-    const minuteur = setTimeout(() => {
-        window.print();
-    }, 300);
-
     return () => {
-        clearTimeout(minuteur);
+        cancelAnimationFrame(raf1);
+        if (raf2) cancelAnimationFrame(raf2);
+        if (timer) clearTimeout(timer);
         window.removeEventListener("afterprint", fin);
+        document.body.classList.remove("printing-declaration");
     };
 }, [declarationAImprimer]);
 
+/* =====================================================
+   Rendu du portail
+===================================================== */
+{declarationAImprimer &&
+    createPortal(
+        <div className="declaration-print-container">
+            <DeclarationDeces
+                key={declarationAImprimer.id}
+                declaration={declarationAImprimer}
+            />
+        </div>,
+        document.body
+    )}
     /* =====================================================
        FERMER L'IMPRESSION APRÈS
     ===================================================== */
@@ -1162,21 +1194,13 @@ useEffect(() => {
                 </div>
             )}
 
-            {/* =================================================
-               IMPRESSION → utilise DeclarationDeces
-            ================================================= */}
+{/* =================================================
+    IMPRESSION → utilise DeclarationDeces
+================================================= */}
 
-            {declarationAImprimer &&
-    createPortal(
-        <div className="declaration-print-container">
-            <DeclarationDeces
-                key={declarationAImprimer.id}
-                declaration={declarationAImprimer}
-            />
-        </div>,
-        document.body
-    )}
         </div>
+
+
     );
 }
 

@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use App\Models\TarifConservation;
 
 class SortieController extends Controller
 {
@@ -141,8 +142,7 @@ class SortieController extends Controller
                 0,
                 (int) $dateArrivee->diffInDays($dateSortie)
             );
-
-            $prixCaisse   = $this->prixCaisse($depot->emplacement);
+            $prixCaisse   = $this->prixCaisse($depot);
             $montantNuits = $jours * $prixCaisse;
 
             $prestationIds = $data['prestations'] ?? [];
@@ -409,18 +409,29 @@ class SortieController extends Controller
     /* =========================================================
        TARIF CAISSE
     ========================================================= */
-
-    private function prixCaisse(?string $emplacement): float
-    {
-        $emplacement = strtolower(trim($emplacement ?? ''));
-
-        if (
-            str_contains($emplacement, 'caisse 2') ||
-            str_contains($emplacement, 'caisse moyenne')
-        ) {
-            return 20000;
-        }
-
+private function prixCaisse(?Depot $depot): float
+{
+    if (!$depot) {
         return 10000;
     }
+
+    $depot->loadMissing('caisson.chambreFroide');
+
+    $nomChambre = optional($depot->caisson?->chambreFroide)->nom;
+
+    if (!$nomChambre && $depot->emplacement) {
+        $nomChambre = trim(explode('·', $depot->emplacement)[0]);
+    }
+
+    if (!$nomChambre) {
+        return 10000;
+    }
+
+    $tarif = TarifConservation::whereRaw(
+        'LOWER(TRIM(emplacement)) = ?',
+        [mb_strtolower(trim($nomChambre))]
+    )->first();
+
+    return (float) ($tarif->prix ?? 10000);
+}
 }

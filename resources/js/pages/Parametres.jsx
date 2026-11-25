@@ -85,6 +85,10 @@ function Parametres() {
 
     const [rechercheHistorique, setRechercheHistorique] = useState("");
 
+const [tarifs, setTarifs] = useState([]);
+const [tarifsEdition, setTarifsEdition] = useState({}); // { idTarif: "valeur saisie" }
+
+
     /* =====================================================
        HELPERS
     ===================================================== */
@@ -405,6 +409,48 @@ function Parametres() {
     };
 
     /* =====================================================
+   TARIFS DE CONSERVATION (chambres froides)
+===================================================== */
+
+const chargerTarifs = async () => {
+    try {
+        setTarifs(asList(await api.tarifs.list()));
+        setTarifsEdition({});
+    } catch (error) {
+        showNotif("error", "Erreur", messageErreur(error, "Impossible de charger les tarifs."));
+    }
+};
+
+const enregistrerTarif = async (tarif) => {
+    const saisie = tarifsEdition[tarif.id];
+    const prix = Number(saisie);
+
+    if (saisie === undefined || saisie === "" || !Number.isFinite(prix) || prix < 0) {
+        showNotif("error", "Prix invalide", "Veuillez saisir un prix valide.");
+        return;
+    }
+
+    try {
+    const res = await api.tarifs.update(tarif.id, prix);
+    const n = res?.sorties_recalculees ?? 0;
+
+    showNotif(
+        "success",
+        "Tarif modifié",
+        `${tarif.emplacement} : ${prix.toLocaleString("fr-FR")} FCFA / jour.` +
+            (n > 0
+                ? ` ${n} sortie${n > 1 ? "s" : ""} non payée${n > 1 ? "s" : ""} recalculée${n > 1 ? "s" : ""}.`
+                : "")
+    );
+    await chargerTarifs();
+} catch (error) {
+    showNotif("error", "Échec", messageErreur(error, "Impossible de modifier le tarif."));
+}
+
+};
+
+
+    /* =====================================================
        SERVICES
     ===================================================== */
 
@@ -494,6 +540,7 @@ function Parametres() {
         if (hasPermission("referentiels.manage")) {
             chargerPrestations();
             chargerChapelles();
+            chargerTarifs();
         }
         chargerServices();
         if (hasPermission("historique.view")) chargerHistorique();
@@ -1028,6 +1075,75 @@ function Parametres() {
                     />
                 </section>
             )}
+
+            {/* TARIFS DE CONSERVATION */}
+{onglet === "tarifs" && (
+    <section className="param-section">
+        <div className="section-title">
+            <h2>Tarifs de conservation (par jour)</h2>
+        </div>
+
+        <div className="settings-table-wrapper">
+            <table className="settings-table">
+                <thead>
+                    <tr>
+                        <th>Chambre froide</th>
+                        <th>Prix par jour (FCFA)</th>
+                        <th>Dernière modification</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {tarifs.map((tarif) => (
+                        <tr key={tarif.id}>
+                            <td>{tarif.emplacement}</td>
+                            <td>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={
+                                        tarifsEdition[tarif.id] ??
+                                        Math.round(Number(tarif.prix))
+                                    }
+                                    onChange={(e) =>
+                                        setTarifsEdition({
+                                            ...tarifsEdition,
+                                            [tarif.id]: e.target.value,
+                                        })
+                                    }
+                                    style={{ width: 140 }}
+                                />
+                            </td>
+                            <td>
+                                {tarif.updated_at
+                                    ? new Date(tarif.updated_at).toLocaleString("fr-FR")
+                                    : "—"}
+                            </td>
+                            <td>
+                                <button
+                                    className="action-edit"
+                                    onClick={() => enregistrerTarif(tarif)}
+                                    disabled={tarifsEdition[tarif.id] === undefined}
+                                >
+                                    Enregistrer
+                                </button>
+                            </td>
+                        </tr>
+                    ))}
+                    {tarifs.length === 0 && (
+                        <tr>
+                            <td colSpan="4" style={{ textAlign: "center", padding: "20px" }}>
+                                Aucun tarif enregistré.
+                            </td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+        </div>
+    </section>
+)}
+
 
             {/* =====================================================
                 SERVICES
